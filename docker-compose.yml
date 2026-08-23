@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: evolure_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-evolure}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evolure_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-evolure_intelligence}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/schemas:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-evolure} -d ${POSTGRES_DB:-evolure_intelligence}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+    container_name: evolure_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-evolure}:${POSTGRES_PASSWORD:-evolure_dev_password}@postgres:5432/${POSTGRES_DB:-evolure_intelligence}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change_me_dev_key}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./apps/api:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  dashboard:
+    build:
+      context: ./apps/dashboard
+    container_name: evolure_dashboard
+    restart: unless-stopped
+    environment:
+      # Usado por fetches no browser (fora do Docker) -> localhost
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      # Usado por fetches no servidor Next.js, que corre dentro do container
+      # e por isso precisa do nome do serviço na rede do Compose, não "localhost"
+      API_INTERNAL_URL: http://api:8000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-evolure}:${POSTGRES_PASSWORD:-evolure_dev_password}@postgres:5432/${POSTGRES_DB:-evolure_intelligence}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./apps/dashboard:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  pgdata:
