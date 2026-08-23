@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from data.ingestion.base import DataSource
+from data.ingestion.contela.connector import ContelaConnector
 
 
 class LabStatus(str, Enum):
@@ -31,6 +32,7 @@ class LabEntry:
     name: str
     status: LabStatus
     connector: type[DataSource] | None = None
+    entities: tuple[str, ...] = ()   # entidades a ingerir, ex: ("orders", "stock")
     notes: str = ""
 
 
@@ -38,9 +40,10 @@ LAB_REGISTRY: dict[str, LabEntry] = {
     "contela": LabEntry(
         id="contela",
         name="Contela",
-        status=LabStatus.READY,
-        connector=None,  # TODO: ligar ContelaConnector quando implementado
-        notes="Funcional com dados reais (stock, orders). Próximo a conectar.",
+        status=LabStatus.ACTIVE,
+        connector=ContelaConnector,
+        entities=("orders", "stock"),
+        notes="Ligado via leitura direta ao Postgres do Contela. Entidades: orders, stock.",
     ),
     "webstudio": LabEntry(
         id="webstudio",

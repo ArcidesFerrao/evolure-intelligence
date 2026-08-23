@@ -11,12 +11,27 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./database/schemas:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-evolure} -d ${POSTGRES_DB:-evolure_intelligence}"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Corre sempre que o compose sobe. Aplica só as migrations novas
+  # (rastreadas em public.schema_migrations) e depois sai (exit 0).
+  # api/dashboard/scheduler só arrancam depois disto terminar com sucesso.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/workers/Dockerfile
+    container_name: evolure_migrate
+    restart: "no"
+    command: python run_migrations.py
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-evolure}:${POSTGRES_PASSWORD:-evolure_dev_password}@postgres:5432/${POSTGRES_DB:-evolure_intelligence}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   api:
     build:
@@ -29,8 +44,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - ./apps/api:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -50,12 +65,46 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - ./apps/dashboard:/app
       - /app/node_modules
       - /app/.next
+
+  # Ingestão + promoção sob pedido (ex: para debug manual):
+  #   docker compose run --rm workers python run_ingestion.py
+  #   docker compose run --rm workers python run_promotion.py
+  workers:
+    build:
+      context: .
+      dockerfile: apps/workers/Dockerfile
+    container_name: evolure_workers
+    profiles: ["tools"]  # não sobe com `docker compose up`; corre sob pedido
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-evolure}:${POSTGRES_PASSWORD:-evolure_dev_password}@postgres:5432/${POSTGRES_DB:-evolure_intelligence}
+      CONTELA_DATABASE_URL: ${CONTELA_DATABASE_URL:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Corre ingestão + promoção automaticamente, a cada INGESTION_INTERVAL_MINUTES.
+  # Sobe junto com `docker compose up` - é isto que resolve a dependência de
+  # correr os workers à mão.
+  scheduler:
+    build:
+      context: .
+      dockerfile: apps/workers/Dockerfile
+    container_name: evolure_scheduler
+    restart: unless-stopped
+    command: python scheduler.py
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-evolure}:${POSTGRES_PASSWORD:-evolure_dev_password}@postgres:5432/${POSTGRES_DB:-evolure_intelligence}
+      CONTELA_DATABASE_URL: ${CONTELA_DATABASE_URL:-}
+      INGESTION_INTERVAL_MINUTES: ${INGESTION_INTERVAL_MINUTES:-30}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:
