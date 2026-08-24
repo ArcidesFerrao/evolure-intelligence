@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 import psycopg
 from fastapi import FastAPI, Header, HTTPException
+from psycopg.rows import dict_row
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("evolure.api")
@@ -65,3 +66,38 @@ def require_internal_key(x_internal_key: str = Header(default="")):
 def internal_ping(_: bool = require_internal_key):  # pragma: no cover - smoke endpoint
     """Confirma que a chave interna funciona antes de construirmos os connectors reais."""
     return {"pong": True}
+
+
+@app.get("/ingestion/status")
+def ingestion_status():
+    """Fase 2 - última corrida de ingestão por (source, entity). Usado pelo
+    dashboard para mostrar o estado do Data Hub sem expor a base de dados."""
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT ON (source, entity)
+                    source, entity, status, records_processed, error_message,
+                    started_at, finished_at
+                FROM raw.ingestion_log
+                ORDER BY source, entity, started_at DESC
+                """
+            )
+            rows = cur.fetchall()
+    return {"runs": rows}
+
+
+@app.get("/analytics/metrics")
+def analytics_metrics():
+    """Fase 3 - métricas mais recentes calculadas pelos Analyzers."""
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT metric, value, change, period, status, computed_at
+                FROM analytics.metrics
+                ORDER BY period DESC, metric
+                """
+            )
+            rows = cur.fetchall()
+    return {"metrics": rows}
