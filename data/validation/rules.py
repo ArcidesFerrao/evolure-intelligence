@@ -34,3 +34,17 @@ def validate_stock(record: dict[str, Any]) -> tuple[bool, str | None]:
     if quantity < 0:
         return False, "quantity negativa"
     return True, None
+
+
+def validate_sale(record: dict[str, Any]) -> tuple[bool, str | None]:
+    total = record.get("total_amount")
+    if total is None:
+        return False, "total_amount em falta"
+    if total < 0:
+        return False, "total_amount negativo"
+    if not record.get("sale_date"):
+        return False, "sale_date em falta"
+    cogs = record.get("cogs")
+    if cogs is not None and cogs < 0:
+        return False, "cogs negativo"
+    return True, None

@@ -22,7 +22,7 @@ logger = logging.getLogger("evolure.workers.run_promotion")
 # passar a alimentar "orders"/"stock", adiciona aqui mais entradas
 # (source, entities) em vez de espalhar isto por vários scripts.
 SOURCES_TO_PROMOTE: list[tuple[str, list[str]]] = [
-    ("contela", ["orders", "stock"]),
+    ("contela", ["orders", "stock", "sales"]),
 ]
 
 

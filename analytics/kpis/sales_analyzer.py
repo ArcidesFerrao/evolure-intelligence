@@ -1,5 +1,9 @@
 """
-SalesAnalyzer - calcula métricas de vendas a partir de core.orders.
+SalesAnalyzer - calcula métricas de vendas a partir de core.sales.
+
+IMPORTANTE: usa core.sales (receita real de retalho, vinda de Sale no
+Contela), não core.orders (que são pedidos de reabastecimento entre Service
+e Supplier - dado real e útil, mas não é "vendas").
 
 Princípio do plano original: Python calcula os números, o LLM (Fase 5) só
 interpreta depois. Os resultados aqui são o que a Intelligence Engine vai
@@ -7,8 +11,9 @@ ler - nunca deve receber os dados crus.
 
 Métricas calculadas por período ("YYYY-MM"):
   - monthly_revenue:  soma de total_amount
-  - order_count:      número de pedidos
+  - order_count:      número de vendas
   - avg_order_value:  monthly_revenue / order_count
+  - gross_margin:     soma de (total_amount - cogs) - lucro bruto real
 
 Cada métrica é comparada com o período anterior para calcular `change`
 (variação %), replicando o formato do exemplo no documento original:
@@ -48,21 +53,24 @@ def _compute_period_metrics(conn: psycopg.Connection, period: str) -> dict[str, 
             """
             SELECT
                 COALESCE(SUM(total_amount), 0) AS revenue,
+                COALESCE(SUM(total_amount - COALESCE(cogs, 0)), 0) AS gross_margin,
                 COUNT(*) AS order_count
-            FROM core.orders
-            WHERE order_date >= %s AND order_date < %s
+            FROM core.sales
+            WHERE sale_date >= %s AND sale_date < %s
             """,
             (start, end),
         )
         row = cur.fetchone()
 
     revenue = float(row["revenue"] or 0)
+    gross_margin = float(row["gross_margin"] or 0)
     order_count = int(row["order_count"] or 0)
     avg_order_value = revenue / order_count if order_count else 0.0
     return {
         "monthly_revenue": revenue,
         "order_count": float(order_count),
         "avg_order_value": avg_order_value,
+        "gross_margin": gross_margin,
     }
 
 
