@@ -119,3 +119,21 @@ def analytics_anomalies():
             )
             rows = cur.fetchall()
     return {"anomalies": rows}
+
+
+@app.get("/analytics/forecasts")
+def analytics_forecasts():
+    """Fase 3 - previsões do Prediction Engine, incluindo actual_result
+    quando o período previsto já tiver dados reais (compare previsto vs real)."""
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT metric, forecast_period, predicted_value, confidence,
+                       model, actual_result, created_at
+                FROM analytics.forecasts
+                ORDER BY forecast_period DESC, metric
+                """
+            )
+            rows = cur.fetchall()
+    return {"forecasts": rows}

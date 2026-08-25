@@ -33,6 +33,16 @@ type Anomaly = {
   detected_at: string;
 };
 
+type Forecast = {
+  metric: string;
+  forecast_period: string;
+  predicted_value: number;
+  confidence: number;
+  model: string;
+  actual_result: number | null;
+  created_at: string;
+};
+
 async function getApiJson<T>(path: string): Promise<T | null> {
   // Este fetch corre no servidor Next.js (dentro do container), por isso
   // usa o nome do serviço na rede do Docker Compose, não "localhost".
@@ -59,16 +69,18 @@ function severityColor(severity: string) {
 }
 
 export default async function Home() {
-  const [health, ingestion, analytics, anomalyData] = await Promise.all([
+  const [health, ingestion, analytics, anomalyData, forecastData] = await Promise.all([
     getApiJson<{ status: string; database: string }>("/health"),
     getApiJson<{ runs: IngestionRun[] }>("/ingestion/status"),
     getApiJson<{ metrics: AnalyticsMetric[] }>("/analytics/metrics"),
     getApiJson<{ anomalies: Anomaly[] }>("/analytics/anomalies"),
+    getApiJson<{ forecasts: Forecast[] }>("/analytics/forecasts"),
   ]);
 
   const runs = ingestion?.runs ?? [];
   const metrics = analytics?.metrics ?? [];
   const anomalies = anomalyData?.anomalies ?? [];
+  const forecasts = forecastData?.forecasts ?? [];
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto" }}>
@@ -183,6 +195,41 @@ export default async function Home() {
                     {a.severity}
                   </td>
                   <td style={{ padding: "0.4rem" }}>{(a.confidence * 100).toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Fase 3 - Prediction Engine */}
+      <section style={{ marginBottom: "2rem" }}>
+        <h2>Fase 3 — Previsão</h2>
+        {forecasts.length === 0 ? (
+          <p style={{ color: "#666" }}>Sem previsões calculadas ainda (histórico insuficiente).</p>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
+                <th style={{ padding: "0.4rem" }}>Métrica</th>
+                <th style={{ padding: "0.4rem" }}>Período previsto</th>
+                <th style={{ padding: "0.4rem" }}>Previsto</th>
+                <th style={{ padding: "0.4rem" }}>Real</th>
+                <th style={{ padding: "0.4rem" }}>Modelo</th>
+                <th style={{ padding: "0.4rem" }}>Confiança</th>
+              </tr>
+            </thead>
+            <tbody>
+              {forecasts.map((f) => (
+                <tr key={`${f.metric}-${f.forecast_period}`} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                  <td style={{ padding: "0.4rem" }}>{f.metric}</td>
+                  <td style={{ padding: "0.4rem" }}>{f.forecast_period}</td>
+                  <td style={{ padding: "0.4rem" }}>{f.predicted_value.toLocaleString("pt-PT")}</td>
+                  <td style={{ padding: "0.4rem" }}>
+                    {f.actual_result != null ? f.actual_result.toLocaleString("pt-PT") : "ainda por vir"}
+                  </td>
+                  <td style={{ padding: "0.4rem", color: "#666" }}>{f.model}</td>
+                  <td style={{ padding: "0.4rem" }}>{(f.confidence * 100).toFixed(0)}%</td>
                 </tr>
               ))}
             </tbody>

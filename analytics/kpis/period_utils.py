@@ -23,6 +23,13 @@ def previous_period(period: str) -> str:
     return f"{year}-{month - 1:02d}"
 
 
+def next_period(period: str) -> str:
+    year, month = map(int, period.split("-"))
+    if month == 12:
+        return f"{year + 1}-01"
+    return f"{year}-{month + 1:02d}"
+
+
 def status_for_change(change: float | None) -> str:
     if change is None:
         return "neutral"  # sem período anterior para comparar

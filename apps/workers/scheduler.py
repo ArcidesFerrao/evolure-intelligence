@@ -19,6 +19,7 @@ import run_analytics
 import run_inventory_analytics
 import run_customer_analytics
 import run_anomaly_detection
+import run_forecasting
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("evolure.scheduler")
@@ -52,6 +53,10 @@ def run_cycle() -> None:
         run_anomaly_detection.main()
     except Exception:
         logger.exception("run_anomaly_detection falhou")
+    try:
+        run_forecasting.main()
+    except Exception:
+        logger.exception("run_forecasting falhou")
     logger.info("=== Fim do ciclo ===")
 
 
