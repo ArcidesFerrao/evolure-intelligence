@@ -41,7 +41,7 @@ CORE_TABLE = {
 
 CORE_COLUMNS = {
     "orders": ["source", "source_external_id", "customer_name", "total_amount", "status", "order_date"],
-    "stock": ["source", "source_external_id", "product_name", "quantity", "supplier_name", "updated_at_source"],
+    "stock": ["source", "source_external_id", "product_name", "quantity", "cost", "critical", "supplier_name", "updated_at_source"],
     "sales": [
         "source", "source_external_id", "sale_date", "total_amount",
         "cogs", "payment_type", "service_name", "supplier_name",
@@ -62,6 +62,8 @@ STAGING_TO_CORE_FIELD = {
         "external_id": "source_external_id",
         "product_name": "product_name",
         "quantity": "quantity",
+        "cost": "cost",
+        "critical": "critical",
         "supplier_name": "supplier_name",
         "updated_at_source": "updated_at_source",
     },

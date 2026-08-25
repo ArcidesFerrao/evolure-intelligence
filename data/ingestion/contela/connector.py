@@ -42,6 +42,8 @@ ENTITY_QUERIES: dict[str, str] = {
             si.id               AS external_id,
             si.name             AS product_name,
             si.stock            AS quantity,
+            si.cost             AS cost,
+            si.critical         AS critical,
             sup."businessName"  AS supplier_name,
             si."updatedAt"      AS updated_at_source
         FROM "StockItem" si
@@ -76,7 +78,7 @@ ENTITY_TARGET_TABLE: dict[str, str] = {
 # aparecem no INSERT (tem de bater certo com database/schemas/002_staging_contela.sql)
 ENTITY_TARGET_COLUMNS: dict[str, list[str]] = {
     "orders": ["external_id", "customer_name", "total_amount", "status", "order_date"],
-    "stock": ["external_id", "product_name", "quantity", "supplier_name", "updated_at_source"],
+    "stock": ["external_id", "product_name", "quantity", "cost", "critical", "supplier_name", "updated_at_source"],
     "sales": ["external_id", "sale_date", "total_amount", "cogs", "payment_type", "service_name", "supplier_name"],
 }
 

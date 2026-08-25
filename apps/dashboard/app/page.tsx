@@ -1,12 +1,3 @@
-// async function getApiHealth() {
-//   const apiUrl = process.env.API_INTERNAL_URL || "http://localhost:8000";
-//   try {
-//     const res = await fetch(`${apiUrl}/health`, { cache: "no-store" });
-//     return await res.json();
-//   } catch (err) {
-//     return { status: "unreachable", database: "unknown" };
-//   }
-// }
 // Padrão para fases futuras: 1 helper de fetch + 1 endpoint na API + 1 secção aqui.
 // Nenhuma secção depende de outra - se uma fase ainda não tem dados, mostra
 // um estado vazio em vez de rebentar as restantes.
@@ -30,6 +21,18 @@ type AnalyticsMetric = {
   computed_at: string;
 };
 
+type Anomaly = {
+  metric: string;
+  period: string;
+  expected_value: number;
+  actual_value: number;
+  deviation_pct: number | null;
+  z_score: number;
+  severity: "low" | "medium" | "high";
+  confidence: number;
+  detected_at: string;
+};
+
 async function getApiJson<T>(path: string): Promise<T | null> {
   // Este fetch corre no servidor Next.js (dentro do container), por isso
   // usa o nome do serviço na rede do Docker Compose, não "localhost".
@@ -44,21 +47,28 @@ async function getApiJson<T>(path: string): Promise<T | null> {
 }
 
 function statusColor(status: string) {
-  if (status === "positive" || status === "success" || status === "ok")
-    return "#1a7f37";
+  if (status === "positive" || status === "success" || status === "ok") return "#1a7f37";
   if (status === "negative" || status === "failed") return "#cf222e";
   return "#666";
 }
 
+function severityColor(severity: string) {
+  if (severity === "high") return "#cf222e";
+  if (severity === "medium") return "#bf8700";
+  return "#666";
+}
+
 export default async function Home() {
-  const [health, ingestion, analytics] = await Promise.all([
+  const [health, ingestion, analytics, anomalyData] = await Promise.all([
     getApiJson<{ status: string; database: string }>("/health"),
     getApiJson<{ runs: IngestionRun[] }>("/ingestion/status"),
     getApiJson<{ metrics: AnalyticsMetric[] }>("/analytics/metrics"),
+    getApiJson<{ anomalies: Anomaly[] }>("/analytics/anomalies"),
   ]);
 
   const runs = ingestion?.runs ?? [];
   const metrics = analytics?.metrics ?? [];
+  const anomalies = anomalyData?.anomalies ?? [];
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto" }}>
@@ -76,13 +86,7 @@ export default async function Home() {
           </li>
           <li>
             Base de dados:{" "}
-            <span
-              style={{
-                color: statusColor(
-                  health?.database === "connected" ? "ok" : "",
-                ),
-              }}
-            >
+            <span style={{ color: statusColor(health?.database === "connected" ? "ok" : "") }}>
               {health?.database ?? "unknown"}
             </span>
           </li>
@@ -95,13 +99,7 @@ export default async function Home() {
         {runs.length === 0 ? (
           <p style={{ color: "#666" }}>Sem corridas de ingestão ainda.</p>
         ) : (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "0.9rem",
-            }}
-          >
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
             <thead>
               <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
                 <th style={{ padding: "0.4rem" }}>Fonte</th>
@@ -113,25 +111,13 @@ export default async function Home() {
             </thead>
             <tbody>
               {runs.map((run) => (
-                <tr
-                  key={`${run.source}-${run.entity}`}
-                  style={{ borderBottom: "1px solid #f0f0f0" }}
-                >
+                <tr key={`${run.source}-${run.entity}`} style={{ borderBottom: "1px solid #f0f0f0" }}>
                   <td style={{ padding: "0.4rem" }}>{run.source}</td>
                   <td style={{ padding: "0.4rem" }}>{run.entity}</td>
-                  <td
-                    style={{
-                      padding: "0.4rem",
-                      color: statusColor(run.status),
-                    }}
-                  >
-                    {run.status}
-                  </td>
+                  <td style={{ padding: "0.4rem", color: statusColor(run.status) }}>{run.status}</td>
                   <td style={{ padding: "0.4rem" }}>{run.records_processed}</td>
                   <td style={{ padding: "0.4rem" }}>
-                    {run.finished_at
-                      ? new Date(run.finished_at).toLocaleString("pt-PT")
-                      : "-"}
+                    {run.finished_at ? new Date(run.finished_at).toLocaleString("pt-PT") : "-"}
                   </td>
                 </tr>
               ))}
@@ -150,27 +136,16 @@ export default async function Home() {
             {metrics.map((m) => (
               <div
                 key={`${m.metric}-${m.period}`}
-                style={{
-                  border: "1px solid #ddd",
-                  borderRadius: 8,
-                  padding: "1rem",
-                  minWidth: 180,
-                }}
+                style={{ border: "1px solid #ddd", borderRadius: 8, padding: "1rem", minWidth: 180 }}
               >
                 <div style={{ fontSize: "0.8rem", color: "#666" }}>
                   {m.metric} · {m.period}
                 </div>
                 <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>
-                  {m.value.toLocaleString("pt-PT", {
-                    maximumFractionDigits: 2,
-                  })}
+                  {m.value.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}
                 </div>
-                <div
-                  style={{ color: statusColor(m.status), fontSize: "0.85rem" }}
-                >
-                  {m.change != null
-                    ? `${(m.change * 100).toFixed(1)}% vs mês anterior`
-                    : "sem comparação"}
+                <div style={{ color: statusColor(m.status), fontSize: "0.85rem" }}>
+                  {m.change != null ? `${(m.change * 100).toFixed(1)}% vs mês anterior` : "sem comparação"}
                 </div>
               </div>
             ))}
@@ -178,9 +153,46 @@ export default async function Home() {
         )}
       </section>
 
+      {/* Fase 3 - Anomaly Engine */}
+      <section style={{ marginBottom: "2rem" }}>
+        <h2>Fase 3 — Anomalias</h2>
+        {anomalies.length === 0 ? (
+          <p style={{ color: "#666" }}>
+            Nenhuma anomalia detetada (ou histórico ainda insuficiente para comparar).
+          </p>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
+                <th style={{ padding: "0.4rem" }}>Métrica</th>
+                <th style={{ padding: "0.4rem" }}>Período</th>
+                <th style={{ padding: "0.4rem" }}>Esperado</th>
+                <th style={{ padding: "0.4rem" }}>Real</th>
+                <th style={{ padding: "0.4rem" }}>Severidade</th>
+                <th style={{ padding: "0.4rem" }}>Confiança</th>
+              </tr>
+            </thead>
+            <tbody>
+              {anomalies.map((a) => (
+                <tr key={`${a.metric}-${a.period}`} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                  <td style={{ padding: "0.4rem" }}>{a.metric}</td>
+                  <td style={{ padding: "0.4rem" }}>{a.period}</td>
+                  <td style={{ padding: "0.4rem" }}>{a.expected_value.toLocaleString("pt-PT")}</td>
+                  <td style={{ padding: "0.4rem" }}>{a.actual_value.toLocaleString("pt-PT")}</td>
+                  <td style={{ padding: "0.4rem", color: severityColor(a.severity), fontWeight: 600 }}>
+                    {a.severity}
+                  </td>
+                  <td style={{ padding: "0.4rem" }}>{(a.confidence * 100).toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
       <p style={{ color: "#999", fontSize: "0.8rem" }}>
-        Cada secção reflete o estado real da base de dados. Novas fases seguem o
-        mesmo padrão: endpoint na API + secção aqui.
+        Cada secção reflete o estado real da base de dados. Novas fases seguem o mesmo padrão:
+        endpoint na API + secção aqui.
       </p>
     </main>
   );

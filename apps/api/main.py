@@ -101,3 +101,21 @@ def analytics_metrics():
             )
             rows = cur.fetchall()
     return {"metrics": rows}
+
+
+@app.get("/analytics/anomalies")
+def analytics_anomalies():
+    """Fase 3 - anomalias detetadas pelo Anomaly Engine (desvios face ao
+    histórico de cada métrica)."""
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT metric, period, expected_value, actual_value,
+                       deviation_pct, z_score, severity, confidence, detected_at
+                FROM analytics.anomalies
+                ORDER BY detected_at DESC
+                """
+            )
+            rows = cur.fetchall()
+    return {"anomalies": rows}

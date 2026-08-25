@@ -16,6 +16,9 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 import run_ingestion
 import run_promotion
 import run_analytics
+import run_inventory_analytics
+import run_customer_analytics
+import run_anomaly_detection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("evolure.scheduler")
@@ -37,6 +40,18 @@ def run_cycle() -> None:
         run_analytics.main()
     except Exception:
         logger.exception("run_analytics falhou")
+    try:
+        run_inventory_analytics.main()
+    except Exception:
+        logger.exception("run_inventory_analytics falhou")
+    try:
+        run_customer_analytics.main()
+    except Exception:
+        logger.exception("run_customer_analytics falhou")
+    try:
+        run_anomaly_detection.main()
+    except Exception:
+        logger.exception("run_anomaly_detection falhou")
     logger.info("=== Fim do ciclo ===")
 
 

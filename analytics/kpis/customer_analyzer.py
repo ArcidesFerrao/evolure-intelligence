@@ -1,23 +1,16 @@
 """
-SalesAnalyzer - calcula métricas de vendas a partir de core.sales.
+CustomerAnalyzer - calcula métricas de clientes a partir de core.sales.
 
-IMPORTANTE: usa core.sales (receita real de retalho, vinda de Sale no
-Contela), não core.orders (que são pedidos de reabastecimento entre Service
-e Supplier - dado real e útil, mas não é "vendas").
+"Cliente" aqui é service_name (uma Service do Contela - modelo B2B: quem
+compra ao Supplier). Mede quantos clientes ativos geraram vendas no
+período, quanto cada um vale em média, e quão concentrada está a receita
+nos maiores clientes (sinal de risco: depender de poucos clientes é frágil).
 
-Princípio do plano original: Python calcula os números, o LLM (Fase 5) só
-interpreta depois. Os resultados aqui são o que a Intelligence Engine vai
-ler - nunca deve receber os dados crus.
-
-Métricas calculadas por período ("YYYY-MM"):
-  - monthly_revenue:  soma de total_amount
-  - order_count:      número de vendas
-  - avg_order_value:  monthly_revenue / order_count
-  - gross_margin:     soma de (total_amount - cogs) - lucro bruto real
-
-Cada métrica é comparada com o período anterior para calcular `change`
-(variação %), replicando o formato do exemplo no documento original:
-{"metric": "monthly_revenue", "value": 520000, "change": -0.08, ...}
+Métricas por período ("YYYY-MM"):
+  - active_customers:          nº de clientes distintos com vendas no período
+  - avg_revenue_per_customer:  receita total / active_customers
+  - top5_revenue_share_pct:    % da receita do período que vem dos 5 maiores clientes
+                                (0-100, não uma fração 0-1, para ler direto no dashboard)
 """
 from __future__ import annotations
 
@@ -30,7 +23,7 @@ from psycopg.rows import dict_row
 
 from analytics.kpis.period_utils import period_bounds, previous_period, status_for_change
 
-logger = logging.getLogger("evolure.analytics.sales")
+logger = logging.getLogger("evolure.analytics.customer")
 
 
 def _compute_period_metrics(conn: psycopg.Connection, period: str) -> dict[str, float]:
@@ -38,26 +31,26 @@ def _compute_period_metrics(conn: psycopg.Connection, period: str) -> dict[str, 
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            SELECT
-                COALESCE(SUM(total_amount), 0) AS revenue,
-                COALESCE(SUM(total_amount - COALESCE(cogs, 0)), 0) AS gross_margin,
-                COUNT(*) AS order_count
+            SELECT service_name, SUM(total_amount) AS revenue
             FROM core.sales
-            WHERE sale_date >= %s AND sale_date < %s
+            WHERE sale_date >= %s AND sale_date < %s AND service_name IS NOT NULL
+            GROUP BY service_name
+            ORDER BY revenue DESC
             """,
             (start, end),
         )
-        row = cur.fetchone()
+        rows = cur.fetchall()
 
-    revenue = float(row["revenue"] or 0)
-    gross_margin = float(row["gross_margin"] or 0)
-    order_count = int(row["order_count"] or 0)
-    avg_order_value = revenue / order_count if order_count else 0.0
+    active_customers = len(rows)
+    total_revenue = float(sum(r["revenue"] for r in rows)) if rows else 0.0
+    top5_revenue = float(sum(r["revenue"] for r in rows[:5])) if rows else 0.0
+    top5_share_pct = (top5_revenue / total_revenue * 100) if total_revenue else 0.0
+    avg_revenue_per_customer = total_revenue / active_customers if active_customers else 0.0
+
     return {
-        "monthly_revenue": revenue,
-        "order_count": float(order_count),
-        "avg_order_value": avg_order_value,
-        "gross_margin": gross_margin,
+        "active_customers": float(active_customers),
+        "avg_revenue_per_customer": avg_revenue_per_customer,
+        "top5_revenue_share_pct": top5_share_pct,
     }
 
 
@@ -78,7 +71,7 @@ def _save_metric(
 
 
 def run(dsn: str, period: str | None = None) -> list[dict[str, Any]]:
-    """Calcula e grava as métricas de vendas para `period` ('YYYY-MM',
+    """Calcula e grava as métricas de clientes para `period` ('YYYY-MM',
     default: mês atual). Devolve a lista de métricas calculadas."""
     if period is None:
         period = date.today().strftime("%Y-%m")
@@ -105,5 +98,5 @@ def run(dsn: str, period: str | None = None) -> list[dict[str, Any]]:
             )
         conn.commit()
 
-    logger.info("SalesAnalyzer: %d métricas calculadas para %s", len(results), period)
+    logger.info("CustomerAnalyzer: %d métricas calculadas para %s", len(results), period)
     return results
