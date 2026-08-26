@@ -96,6 +96,17 @@
   margin-bottom: 2rem;
 }
 
+.insightText {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--text);
+  line-height: 1.5;
+  border-left: 2px solid var(--accent);
+  padding: 0.25rem 0 0.25rem 1rem;
+  margin: 0 0 1.75rem;
+}
+
 .metricCard {
   background: var(--surface);
   border: 1px solid var(--hairline);

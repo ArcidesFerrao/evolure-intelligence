@@ -29,6 +29,13 @@ type Forecast = {
   model: string;
 };
 
+type Insight = {
+  period: string;
+  insight_text: string;
+  model: string;
+  created_at: string;
+};
+
 async function getApiJson<T>(path: string): Promise<T | null> {
   const apiUrl = process.env.API_INTERNAL_URL || "http://localhost:8000";
   try {
@@ -61,15 +68,17 @@ function stampClass(severity: string): string {
 }
 
 export default async function ExecutiveDashboard() {
-  const [metricsData, anomalyData, forecastData] = await Promise.all([
+  const [metricsData, anomalyData, forecastData, insightData] = await Promise.all([
     getApiJson<{ metrics: AnalyticsMetric[] }>("/analytics/metrics"),
     getApiJson<{ anomalies: Anomaly[] }>("/analytics/anomalies"),
     getApiJson<{ forecasts: Forecast[] }>("/analytics/forecasts"),
+    getApiJson<{ insights: Insight[] }>("/intelligence/insights"),
   ]);
 
   const metrics = metricsData?.metrics ?? [];
   const anomalies = anomalyData?.anomalies ?? [];
   const forecasts = forecastData?.forecasts ?? [];
+  const latestInsight = insightData?.insights?.[0];
 
   const revenue = findMetric(metrics, "monthly_revenue");
   const margin = findMetric(metrics, "gross_margin");
@@ -104,6 +113,11 @@ export default async function ExecutiveDashboard() {
           </div>
         )}
       </div>
+
+      {/* Insight do LLM - interpretação em texto, nunca números que ele próprio calculou */}
+      {latestInsight && (
+        <p className={styles.insightText}>&ldquo;{latestInsight.insight_text}&rdquo;</p>
+      )}
 
       {/* Métricas de apoio */}
       <div className={styles.grid}>

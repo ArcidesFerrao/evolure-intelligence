@@ -137,3 +137,19 @@ def analytics_forecasts():
             )
             rows = cur.fetchall()
     return {"forecasts": rows}
+
+
+@app.get("/intelligence/insights")
+def intelligence_insights():
+    """Fase 5 - insights gerados pelo LLM a partir das métricas já calculadas."""
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT period, insight_text, model, created_at
+                FROM intelligence.insights
+                ORDER BY period DESC
+                """
+            )
+            rows = cur.fetchall()
+    return {"insights": rows}
