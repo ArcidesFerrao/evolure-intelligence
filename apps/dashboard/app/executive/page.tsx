@@ -36,6 +36,18 @@ type Insight = {
   created_at: string;
 };
 
+type Task = {
+  id: number;
+  title: string;
+  description: string;
+  priority: "low" | "medium" | "high";
+  category: string;
+  status: string;
+  automation_type: string | null;
+  expected_impact: "low" | "medium" | "high";
+  period: string | null;
+};
+
 async function getApiJson<T>(path: string): Promise<T | null> {
   const apiUrl = process.env.API_INTERNAL_URL || "http://localhost:8000";
   try {
@@ -68,17 +80,19 @@ function stampClass(severity: string): string {
 }
 
 export default async function ExecutiveDashboard() {
-  const [metricsData, anomalyData, forecastData, insightData] = await Promise.all([
+  const [metricsData, anomalyData, forecastData, insightData, taskData] = await Promise.all([
     getApiJson<{ metrics: AnalyticsMetric[] }>("/analytics/metrics"),
     getApiJson<{ anomalies: Anomaly[] }>("/analytics/anomalies"),
     getApiJson<{ forecasts: Forecast[] }>("/analytics/forecasts"),
     getApiJson<{ insights: Insight[] }>("/intelligence/insights"),
+    getApiJson<{ tasks: Task[] }>("/tasks"),
   ]);
 
   const metrics = metricsData?.metrics ?? [];
   const anomalies = anomalyData?.anomalies ?? [];
   const forecasts = forecastData?.forecasts ?? [];
   const latestInsight = insightData?.insights?.[0];
+  const tasks = taskData?.tasks ?? [];
 
   const revenue = findMetric(metrics, "monthly_revenue");
   const margin = findMetric(metrics, "gross_margin");
@@ -160,11 +174,20 @@ export default async function ExecutiveDashboard() {
         </div>
       )}
 
-      {/* Oportunidades e tarefas - ainda por construir (Fase 5/6) */}
-      <p className={styles.sectionLabel}>Oportunidades e tarefas pendentes</p>
-      <p className={styles.emptyState}>
-        Chega com o Task Engine (Fase 6) e o Recommendation Engine (Fase 5) — ainda não construídos.
-      </p>
+      {/* Oportunidades e tarefas - geradas pela Intelligence Engine (Fase 5/6) */}
+      <p className={styles.sectionLabel}>Tarefas pendentes</p>
+      {tasks.length === 0 ? (
+        <p className={styles.emptyState}>Nenhuma tarefa gerada ainda.</p>
+      ) : (
+        <div className={styles.stampRow}>
+          {tasks.map((t) => (
+            <div key={t.id} className={stampClass(t.priority === "high" ? "high" : t.priority === "medium" ? "medium" : "low")}>
+              <span>{t.category} · {t.status}</span>
+              <span className={styles.stampDetail}>{t.title}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

@@ -8,6 +8,7 @@ Requer GEMINI_API_KEY no ambiente. Conta gratuita em https://aistudio.google.com
 """
 from __future__ import annotations
 
+import json
 import os
 
 from google import genai
@@ -38,3 +39,30 @@ def generate_text(prompt: str, model: str = DEFAULT_MODEL) -> str:
         ),
     )
     return (response.text or "").strip()
+
+
+def generate_json(prompt: str, model: str = DEFAULT_MODEL) -> dict:
+    """Como generate_text, mas força o modelo a devolver JSON válido
+    (response_mime_type) em vez de prosa - usado quando precisamos de campos
+    estruturados (ex: gerar uma tarefa), não de um resumo em texto livre."""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY não está definido")
+
+    client = genai.Client(api_key=api_key)
+    try:
+        thinking_config = types.ThinkingConfig(thinking_level="low")
+    except Exception:
+        thinking_config = types.ThinkingConfig(thinking_budget=256)
+
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0.3,
+            max_output_tokens=1024,
+            thinking_config=thinking_config,
+            response_mime_type="application/json",
+        ),
+    )
+    return json.loads(response.text or "{}")

@@ -21,6 +21,8 @@ import run_customer_analytics
 import run_anomaly_detection
 import run_forecasting
 import run_insight_generation
+import run_task_generation
+import run_automation
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("evolure.scheduler")
@@ -62,6 +64,14 @@ def run_cycle() -> None:
         run_insight_generation.main()
     except Exception:
         logger.exception("run_insight_generation falhou")
+    try:
+        run_task_generation.main()
+    except Exception:
+        logger.exception("run_task_generation falhou")
+    try:
+        run_automation.main()
+    except Exception:
+        logger.exception("run_automation falhou")
     logger.info("=== Fim do ciclo ===")
 
 

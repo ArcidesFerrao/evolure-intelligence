@@ -153,3 +153,20 @@ def intelligence_insights():
             )
             rows = cur.fetchall()
     return {"insights": rows}
+
+
+@app.get("/tasks")
+def list_tasks():
+    """Fase 6 - tarefas geradas a partir dos insights, com o estado de automação."""
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, title, description, priority, category, source,
+                       status, automation_type, expected_impact, period, created_at
+                FROM tasks.business_tasks
+                ORDER BY created_at DESC
+                """
+            )
+            rows = cur.fetchall()
+    return {"tasks": rows}
