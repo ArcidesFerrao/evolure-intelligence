@@ -42,7 +42,7 @@ LAB_REGISTRY: dict[str, LabEntry] = {
         name="Contela",
         status=LabStatus.ACTIVE,
         connector=ContelaConnector,
-        entities=("orders", "stock", "sales"),
+        entities=("organizations", "orders", "stock", "sales"),
         notes="Ligado via leitura direta ao Postgres do Contela. Entidades: orders, stock, sales.",
     ),
     "webstudio": LabEntry(

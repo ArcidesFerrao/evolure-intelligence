@@ -10,6 +10,12 @@ do model como nome de tabela, ex: model Order -> tabela "Order").
 Se o teu schema.prisma tiver @@map(...) ou nomes diferentes, muda só o
 dicionário ENTITY_QUERIES - o resto do connector não precisa de mudar.
 ============================================================================
+
+V2: "organizations" é uma nova entidade que unifica Service e Supplier como
+contas com identidade própria (em vez de só texto solto em customer_name/
+supplier_name). As restantes entidades passaram a trazer também o id da
+organização (organization_external_id), para a promoção conseguir ligar
+tudo em core.organizations.
 """
 from __future__ import annotations
 
@@ -23,11 +29,21 @@ from data.ingestion.base import DataSource
 
 # entity -> query SQL contra a base do Contela
 ENTITY_QUERIES: dict[str, str] = {
+    # Service e Supplier são as duas contas de negócio no Contela - ambas
+    # podem, no futuro, ter uma subscrição própria à plataforma.
+    "organizations": """
+        SELECT id AS external_id, "businessName" AS name, 'SERVICE' AS org_type, "createdAt" AS created_at_source
+        FROM "Service"
+        UNION ALL
+        SELECT id AS external_id, "businessName" AS name, 'SUPPLIER' AS org_type, "createdAt" AS created_at_source
+        FROM "Supplier"
+    """,
     # "cliente" no Contela é uma Service (modelo B2B: Supplier vende a Service),
     # ligada a Order via serviceId.
     "orders": """
         SELECT
             o.id                AS external_id,
+            o."serviceId"       AS organization_external_id,
             s."businessName"    AS customer_name,
             o.total             AS total_amount,
             o.status::text      AS status,
@@ -37,9 +53,11 @@ ENTITY_QUERIES: dict[str, str] = {
     """,
     # StockItem não tem campo sku no schema atual - omitido.
     # Filtra deletedAt (soft delete) para não trazer itens apagados.
+    # organization_external_id aqui é o Supplier - dono do stock.
     "stock": """
         SELECT
             si.id               AS external_id,
+            si."supplierId"     AS organization_external_id,
             si.name             AS product_name,
             si.stock            AS quantity,
             si.cost             AS cost,
@@ -52,9 +70,11 @@ ENTITY_QUERIES: dict[str, str] = {
     """,
     # Sale = receita real de retalho (diferente de Order, que é pedido de
     # reabastecimento entre Service e Supplier). cogs incluído para margem.
+    # organization_external_id aqui é a Service que vendeu.
     "sales": """
         SELECT
             s.id                AS external_id,
+            s."serviceId"       AS organization_external_id,
             s.timestamp         AS sale_date,
             s.total             AS total_amount,
             s.cogs              AS cogs,
@@ -69,17 +89,32 @@ ENTITY_QUERIES: dict[str, str] = {
 
 # entity -> tabela de destino em staging (Evolure Intelligence)
 ENTITY_TARGET_TABLE: dict[str, str] = {
+    "organizations": "staging.contela_organizations",
     "orders": "staging.contela_orders",
     "stock": "staging.contela_stock",
     "sales": "staging.contela_sales",
 }
 
 # entity -> colunas esperadas na tabela de destino, na ordem em que
-# aparecem no INSERT (tem de bater certo com database/schemas/002_staging_contela.sql)
+# aparecem no INSERT (tem de bater certo com as migrations em database/migrations/)
 ENTITY_TARGET_COLUMNS: dict[str, list[str]] = {
-    "orders": ["external_id", "customer_name", "total_amount", "status", "order_date"],
-    "stock": ["external_id", "product_name", "quantity", "cost", "critical", "supplier_name", "updated_at_source"],
-    "sales": ["external_id", "sale_date", "total_amount", "cogs", "payment_type", "service_name", "supplier_name"],
+    "organizations": ["external_id", "name", "org_type", "created_at_source"],
+    "orders": ["external_id", "organization_external_id", "customer_name", "total_amount", "status", "order_date"],
+    "stock": [
+        "external_id", "organization_external_id", "product_name", "quantity",
+        "cost", "critical", "supplier_name", "updated_at_source",
+    ],
+    "sales": [
+        "external_id", "organization_external_id", "sale_date", "total_amount",
+        "cogs", "payment_type", "service_name", "supplier_name",
+    ],
+}
+
+# entity -> colunas que formam a chave de conflito (ON CONFLICT). Por
+# omissão é só "external_id", mas "organizations" precisa de (external_id,
+# org_type) porque Service e Supplier podem, em teoria, ter o mesmo id.
+ENTITY_CONFLICT_COLUMNS: dict[str, list[str]] = {
+    "organizations": ["external_id", "org_type"],
 }
 
 
@@ -135,15 +170,18 @@ class ContelaConnector(DataSource):
         if table is None or columns is None:
             raise ValueError(f"Entidade desconhecida para o Contela: {entity}")
 
+        conflict_columns = ENTITY_CONFLICT_COLUMNS.get(entity, ["external_id"])
+
         assert self._dest_conn is not None
         placeholders = ", ".join(f"%({col})s" for col in columns)
         column_list = ", ".join(columns)
-        update_clause = ", ".join(f"{col} = EXCLUDED.{col}" for col in columns if col != "external_id")
+        conflict_list = ", ".join(conflict_columns)
+        update_clause = ", ".join(f"{col} = EXCLUDED.{col}" for col in columns if col not in conflict_columns)
 
         sql = f"""
             INSERT INTO {table} ({column_list})
             VALUES ({placeholders})
-            ON CONFLICT (external_id) DO UPDATE SET {update_clause}, ingested_at = now()
+            ON CONFLICT ({conflict_list}) DO UPDATE SET {update_clause}, ingested_at = now()
         """
         with self._dest_conn.cursor() as cur:
             cur.executemany(sql, records)

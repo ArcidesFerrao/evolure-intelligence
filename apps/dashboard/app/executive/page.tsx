@@ -94,18 +94,22 @@ export default async function ExecutiveDashboard() {
   const latestInsight = insightData?.insights?.[0];
   const tasks = taskData?.tasks ?? [];
 
-  const revenue = findMetric(metrics, "monthly_revenue");
-  const margin = findMetric(metrics, "gross_margin");
-  const customers = findMetric(metrics, "active_customers");
-  const orders = findMetric(metrics, "order_count");
-  const avgOrder = findMetric(metrics, "avg_order_value");
+  const revenue = findMetric(metrics, "customer_business_gmv");
+  const margin = findMetric(metrics, "customer_business_gross_margin");
+  const customers = findMetric(metrics, "customer_business_active_customers");
+  const orders = findMetric(metrics, "customer_business_transaction_count");
+  const avgOrder = findMetric(metrics, "customer_business_avg_transaction_value");
   const stockValue = findMetric(metrics, "stock_value");
-  const revenueForecast = forecasts.find((f) => f.metric === "monthly_revenue");
+  const revenueForecast = forecasts.find((f) => f.metric === "customer_business_gmv");
 
   return (
     <main className={`${styles.page} ${display.variable} ${mono.variable}`} style={{ fontFamily: "var(--font-display), system-ui" }}>
       <p className={styles.eyebrow}>Livro de bordo · {revenue?.period ?? "—"}</p>
       <h1 className={styles.title}>Executive Dashboard</h1>
+      <p className={styles.scopeNote}>
+        Os números abaixo (Contela) representam a atividade agregada dos negócios que usam a
+        plataforma — não é receita própria da Evolure Labs.
+      </p>
 
       {/* Hero: receita é a única coisa que precisa de ser vista de longe */}
       <div className={styles.hero}>

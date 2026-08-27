@@ -1,16 +1,17 @@
 """
-CustomerAnalyzer - calcula métricas de clientes a partir de core.sales.
+CustomerAnalyzer - calcula métricas de concentração de clientes a partir de
+core.revenue_transactions (revenue_type='CUSTOMER_BUSINESS'), agrupado por
+organization_id real (V2) - antes agrupava por texto solto (service_name),
+o que não distinguia corretamente organizações com nomes parecidos.
 
-"Cliente" aqui é service_name (uma Service do Contela - modelo B2B: quem
-compra ao Supplier). Mede quantos clientes ativos geraram vendas no
-período, quanto cada um vale em média, e quão concentrada está a receita
-nos maiores clientes (sinal de risco: depender de poucos clientes é frágil).
+"Cliente" aqui é uma organização (Service do Contela) que gerou vendas no
+período. Mede quantas organizações ativas, quanto cada uma vale em média,
+e quão concentrada está a receita nas maiores (risco de dependência).
 
 Métricas por período ("YYYY-MM"):
-  - active_customers:          nº de clientes distintos com vendas no período
-  - avg_revenue_per_customer:  receita total / active_customers
-  - top5_revenue_share_pct:    % da receita do período que vem dos 5 maiores clientes
-                                (0-100, não uma fração 0-1, para ler direto no dashboard)
+  - customer_business_active_customers:        nº de organizações distintas com vendas no período
+  - customer_business_avg_gmv_per_customer:     receita total / active_customers
+  - customer_business_top5_gmv_share_pct:       % da receita do período que vem das 5 maiores organizações (0-100)
 """
 from __future__ import annotations
 
@@ -25,19 +26,24 @@ from analytics.kpis.period_utils import period_bounds, previous_period, status_f
 
 logger = logging.getLogger("evolure.analytics.customer")
 
+REVENUE_TYPE = "CUSTOMER_BUSINESS"
+SOURCE = "contela"
+
 
 def _compute_period_metrics(conn: psycopg.Connection, period: str) -> dict[str, float]:
     start, end = period_bounds(period)
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            SELECT service_name, SUM(total_amount) AS revenue
-            FROM core.sales
-            WHERE sale_date >= %s AND sale_date < %s AND service_name IS NOT NULL
-            GROUP BY service_name
+            SELECT organization_id, SUM(amount) AS revenue
+            FROM core.revenue_transactions
+            WHERE revenue_type = %s AND source = %s
+              AND transaction_date >= %s AND transaction_date < %s
+              AND organization_id IS NOT NULL
+            GROUP BY organization_id
             ORDER BY revenue DESC
             """,
-            (start, end),
+            (REVENUE_TYPE, SOURCE, start, end),
         )
         rows = cur.fetchall()
 
@@ -48,9 +54,9 @@ def _compute_period_metrics(conn: psycopg.Connection, period: str) -> dict[str, 
     avg_revenue_per_customer = total_revenue / active_customers if active_customers else 0.0
 
     return {
-        "active_customers": float(active_customers),
-        "avg_revenue_per_customer": avg_revenue_per_customer,
-        "top5_revenue_share_pct": top5_share_pct,
+        "customer_business_active_customers": float(active_customers),
+        "customer_business_avg_gmv_per_customer": avg_revenue_per_customer,
+        "customer_business_top5_gmv_share_pct": top5_share_pct,
     }
 
 

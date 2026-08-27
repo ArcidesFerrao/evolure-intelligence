@@ -19,10 +19,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger("evolure.workers.run_promotion")
 
 # Fase 2: só o Contela está ligado. Quando o Webstudio (ou outro Lab)
-# passar a alimentar "orders"/"stock", adiciona aqui mais entradas
-# (source, entities) em vez de espalhar isto por vários scripts.
+# passar a alimentar dados, adiciona aqui mais entradas (source, entities)
+# em vez de espalhar isto por vários scripts.
+#
+# V2: "organizations" tem de vir SEMPRE primeiro - orders/stock/sales
+# resolvem organization_id contra core.organizations, por isso precisam
+# que as organizações já lá estejam.
 SOURCES_TO_PROMOTE: list[tuple[str, list[str]]] = [
-    ("contela", ["orders", "stock", "sales"]),
+    ("contela", ["organizations", "orders", "stock", "sales"]),
 ]
 
 

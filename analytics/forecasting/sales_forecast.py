@@ -1,6 +1,6 @@
 """
 Prediction Engine (forecasting inicial) - prevê o próximo período para
-métricas transacionais (monthly_revenue, order_count), a partir do
+métricas transacionais (customer_business_gmv, customer_business_transaction_count), a partir do
 histórico em analytics.metrics.
 
 Honesto quanto à qualidade do modelo conforme o histórico disponível:
@@ -29,7 +29,7 @@ from analytics.kpis.period_utils import next_period
 
 logger = logging.getLogger("evolure.analytics.forecasting")
 
-FORECAST_METRICS = ["monthly_revenue", "order_count"]
+FORECAST_METRICS = ["customer_business_gmv", "customer_business_transaction_count"]
 MIN_POINTS_FOR_REGRESSION = 3
 
 

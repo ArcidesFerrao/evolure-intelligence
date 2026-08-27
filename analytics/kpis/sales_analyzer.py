@@ -1,23 +1,22 @@
 """
-SalesAnalyzer - calcula métricas de vendas a partir de core.sales.
+SalesAnalyzer - calcula métricas a partir de core.revenue_transactions,
+filtradas a revenue_type='CUSTOMER_BUSINESS' (atividade agregada dos
+negócios - Services - que usam a Contela).
 
-IMPORTANTE: usa core.sales (receita real de retalho, vinda de Sale no
-Contela), não core.orders (que são pedidos de reabastecimento entre Service
-e Supplier - dado real e útil, mas não é "vendas").
+IMPORTANTE: isto NÃO é receita própria da Evolure Labs. É o volume
+transacionado por todos os negócios que usam a plataforma Contela. Quando
+a Contela passar a faturar os seus próprios utilizadores, essa receita
+entra como revenue_type='PLATFORM_SUBSCRIPTION' (ou similar) na mesma
+tabela, e merece o seu próprio Analyzer (ver database/migrations/011).
 
 Princípio do plano original: Python calcula os números, o LLM (Fase 5) só
-interpreta depois. Os resultados aqui são o que a Intelligence Engine vai
-ler - nunca deve receber os dados crus.
+interpreta depois.
 
 Métricas calculadas por período ("YYYY-MM"):
-  - monthly_revenue:  soma de total_amount
-  - order_count:      número de vendas
-  - avg_order_value:  monthly_revenue / order_count
-  - gross_margin:     soma de (total_amount - cogs) - lucro bruto real
-
-Cada métrica é comparada com o período anterior para calcular `change`
-(variação %), replicando o formato do exemplo no documento original:
-{"metric": "monthly_revenue", "value": 520000, "change": -0.08, ...}
+  - customer_business_gmv:                 soma de amount (Gross Merchandise Value)
+  - customer_business_transaction_count:    nº de transações (vendas)
+  - customer_business_avg_transaction_value: gmv / transaction_count
+  - customer_business_gross_margin:         soma de (amount - cogs), cogs vindo de metadata
 """
 from __future__ import annotations
 
@@ -32,6 +31,9 @@ from analytics.kpis.period_utils import period_bounds, previous_period, status_f
 
 logger = logging.getLogger("evolure.analytics.sales")
 
+REVENUE_TYPE = "CUSTOMER_BUSINESS"
+SOURCE = "contela"
+
 
 def _compute_period_metrics(conn: psycopg.Connection, period: str) -> dict[str, float]:
     start, end = period_bounds(period)
@@ -39,25 +41,26 @@ def _compute_period_metrics(conn: psycopg.Connection, period: str) -> dict[str, 
         cur.execute(
             """
             SELECT
-                COALESCE(SUM(total_amount), 0) AS revenue,
-                COALESCE(SUM(total_amount - COALESCE(cogs, 0)), 0) AS gross_margin,
-                COUNT(*) AS order_count
-            FROM core.sales
-            WHERE sale_date >= %s AND sale_date < %s
+                COALESCE(SUM(amount), 0) AS gmv,
+                COALESCE(SUM(amount - COALESCE((metadata->>'cogs')::numeric, 0)), 0) AS gross_margin,
+                COUNT(*) AS txn_count
+            FROM core.revenue_transactions
+            WHERE revenue_type = %s AND source = %s
+              AND transaction_date >= %s AND transaction_date < %s
             """,
-            (start, end),
+            (REVENUE_TYPE, SOURCE, start, end),
         )
         row = cur.fetchone()
 
-    revenue = float(row["revenue"] or 0)
+    gmv = float(row["gmv"] or 0)
     gross_margin = float(row["gross_margin"] or 0)
-    order_count = int(row["order_count"] or 0)
-    avg_order_value = revenue / order_count if order_count else 0.0
+    txn_count = int(row["txn_count"] or 0)
+    avg_txn_value = gmv / txn_count if txn_count else 0.0
     return {
-        "monthly_revenue": revenue,
-        "order_count": float(order_count),
-        "avg_order_value": avg_order_value,
-        "gross_margin": gross_margin,
+        "customer_business_gmv": gmv,
+        "customer_business_transaction_count": float(txn_count),
+        "customer_business_avg_transaction_value": avg_txn_value,
+        "customer_business_gross_margin": gross_margin,
     }
 
 
@@ -78,8 +81,8 @@ def _save_metric(
 
 
 def run(dsn: str, period: str | None = None) -> list[dict[str, Any]]:
-    """Calcula e grava as métricas de vendas para `period` ('YYYY-MM',
-    default: mês atual). Devolve a lista de métricas calculadas."""
+    """Calcula e grava as métricas para `period` ('YYYY-MM', default: mês
+    atual). Devolve a lista de métricas calculadas."""
     if period is None:
         period = date.today().strftime("%Y-%m")
     prev_period = previous_period(period)

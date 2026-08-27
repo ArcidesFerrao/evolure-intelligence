@@ -51,7 +51,7 @@ def _get_forecast(conn: psycopg.Connection, period: str) -> dict[str, Any] | Non
         cur.execute(
             """
             SELECT metric, predicted_value, confidence, model
-            FROM analytics.forecasts WHERE forecast_period = %s AND metric = 'monthly_revenue'
+            FROM analytics.forecasts WHERE forecast_period = %s AND metric = 'customer_business_gmv'
             """,
             (period,),
         )

@@ -31,6 +31,13 @@
   font-weight: 600;
 }
 
+.scopeNote {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin: -1.4rem 0 2rem;
+  max-width: 55ch;
+}
+
 .hero {
   display: flex;
   align-items: baseline;

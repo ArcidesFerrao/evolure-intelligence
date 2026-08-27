@@ -48,3 +48,11 @@ def validate_sale(record: dict[str, Any]) -> tuple[bool, str | None]:
     if cogs is not None and cogs < 0:
         return False, "cogs negativo"
     return True, None
+
+
+def validate_organization(record: dict[str, Any]) -> tuple[bool, str | None]:
+    if not record.get("name"):
+        return False, "name em falta"
+    if record.get("org_type") not in ("SERVICE", "SUPPLIER"):
+        return False, "org_type inválido"
+    return True, None
