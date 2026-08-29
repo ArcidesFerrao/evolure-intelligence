@@ -1,3 +1,149 @@
+@import "tailwindcss";
+
+.analytics-section {
+  margin-bottom: 3rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2rem;
+}
+
+.sectionHeader,
+.section-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.section-header p {
+  margin: 0.35rem 0 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.period-badge {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.metric-group {
+  margin-bottom: 2rem;
+}
+
+.metric-group h3 {
+  margin: 0 0 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.metric-card {
+  min-height: 145px;
+  padding: 1.2rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: white;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+
+.metric-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.metric-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.metric-description {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.metric-value {
+  margin-top: 1rem;
+  font-size: 1.8rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #111827;
+}
+
+.metric-unit {
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.metric-change {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.metric-change span {
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+.metric-change.positive {
+  color: #16803c;
+}
+
+.metric-change.negative {
+  color: #c0392b;
+}
+
+.metric-change.neutral {
+  color: #9ca3af;
+}
+
+.metricStatus {
+  border: 1px solid var(--hairline);
+  font-size: 0.65rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  color: #6b7280;
+}
+
+.metric-status {
+  font-size: 0.65rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6b7280;
+}
 .page {
   --bg: #14181c;
   --surface: #1c2127;

@@ -62,7 +62,10 @@ CORE_CONFLICT_COLUMNS = {
 
 CORE_COLUMNS = {
     "organizations": ["source", "source_external_id", "name", "org_type", "created_at_source"],
-    "orders": ["source", "source_external_id", "organization_id", "customer_name", "total_amount", "status", "order_date"],
+    "orders": [
+        "source", "source_external_id", "organization_id", "supplier_organization_id",
+        "customer_name", "supplier_name", "total_amount", "status", "order_date",
+    ],
     "stock": [
         "source", "source_external_id", "organization_id", "product_name", "quantity",
         "cost", "critical", "supplier_name", "updated_at_source",
@@ -83,6 +86,7 @@ STAGING_TO_CORE_FIELD = {
     "orders": {
         "external_id": "source_external_id",
         "customer_name": "customer_name",
+        "supplier_name": "supplier_name",
         "total_amount": "total_amount",
         "status": "status",
         "order_date": "order_date",
@@ -98,9 +102,16 @@ STAGING_TO_CORE_FIELD = {
     },
 }
 
-# entidades cujo staging tem organization_external_id e que precisam de
-# resolver organization_id contra core.organizations antes do upsert.
-ORG_LOOKUP_ENTITIES = {"orders", "stock", "sales"}
+# entidade -> lista de (campo em staging, campo em core) a resolver contra
+# core.organizations. "orders" tem dois: quem fez o pedido (organization_id,
+# uma Service) e quem o recebe (supplier_organization_id, um Supplier).
+ORG_LOOKUP_FIELDS: dict[str, list[tuple[str, str]]] = {
+    "orders": [
+        ("organization_external_id", "organization_id"),
+        ("supplier_organization_external_id", "supplier_organization_id"),
+    ],
+    "stock": [("organization_external_id", "organization_id")],
+}
 
 
 def _resolve_organization_id(conn: psycopg.Connection, source: str, external_id: str | None) -> int | None:
@@ -148,10 +159,8 @@ def _promote_generic(entity: str, source: str, conn: psycopg.Connection) -> dict
         for staging_field, core_field in field_map.items():
             core_record[core_field] = row.get(staging_field)
 
-        if entity in ORG_LOOKUP_ENTITIES and entity != "organizations":
-            core_record["organization_id"] = _resolve_organization_id(
-                conn, source, row.get("organization_external_id")
-            )
+        for staging_field, core_field in ORG_LOOKUP_FIELDS.get(entity, []):
+            core_record[core_field] = _resolve_organization_id(conn, source, row.get(staging_field))
 
         placeholders = ", ".join(f"%({col})s" for col in core_columns)
         column_list = ", ".join(core_columns)

@@ -50,7 +50,8 @@ LAB_REGISTRY: dict[str, LabEntry] = {
         name="Webstudio",
         status=LabStatus.PLANNED,
         connector=None,
-        notes="Só landing page ainda. Aguarda backend/admin (Campaign/Lead/Project).",
+        entities=("campaigns", "leads", "proposals", "projects"),
+        notes="Schema core pronto (database/migrations/013). Aguarda backend/admin e connector.",
     ),
     "the_ject": LabEntry(
         id="the_ject",

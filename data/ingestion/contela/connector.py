@@ -44,12 +44,15 @@ ENTITY_QUERIES: dict[str, str] = {
         SELECT
             o.id                AS external_id,
             o."serviceId"       AS organization_external_id,
+            o."supplierId"      AS supplier_organization_external_id,
             s."businessName"    AS customer_name,
+            sup."businessName"  AS supplier_name,
             o.total             AS total_amount,
             o.status::text      AS status,
             o.timestamp         AS order_date
         FROM "Order" o
         LEFT JOIN "Service" s ON s.id = o."serviceId"
+        LEFT JOIN "Supplier" sup ON sup.id = o."supplierId"
     """,
     # StockItem não tem campo sku no schema atual - omitido.
     # Filtra deletedAt (soft delete) para não trazer itens apagados.
@@ -99,7 +102,10 @@ ENTITY_TARGET_TABLE: dict[str, str] = {
 # aparecem no INSERT (tem de bater certo com as migrations em database/migrations/)
 ENTITY_TARGET_COLUMNS: dict[str, list[str]] = {
     "organizations": ["external_id", "name", "org_type", "created_at_source"],
-    "orders": ["external_id", "organization_external_id", "customer_name", "total_amount", "status", "order_date"],
+    "orders": [
+        "external_id", "organization_external_id", "supplier_organization_external_id",
+        "customer_name", "supplier_name", "total_amount", "status", "order_date",
+    ],
     "stock": [
         "external_id", "organization_external_id", "product_name", "quantity",
         "cost", "critical", "supplier_name", "updated_at_source",

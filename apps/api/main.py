@@ -170,3 +170,49 @@ def list_tasks():
             )
             rows = cur.fetchall()
     return {"tasks": rows}
+
+
+@app.get("/webstudio/overview")
+def webstudio_overview():
+    """Funil da Webstudio. Tabelas vazias por agora (sem backend/connector
+    ligado ainda) - devolve zeros de propósito, não é erro."""
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS n FROM core.leads")
+            leads_total = cur.fetchone()["n"]
+
+            cur.execute("SELECT COUNT(*) AS n FROM core.leads WHERE qualification IS NOT NULL")
+            leads_qualified = cur.fetchone()["n"]
+
+            cur.execute("SELECT COUNT(*) AS n FROM core.proposals")
+            proposals_total = cur.fetchone()["n"]
+
+            cur.execute("SELECT COUNT(*) AS n FROM core.proposals WHERE status = 'accepted'")
+            proposals_accepted = cur.fetchone()["n"]
+
+            cur.execute("SELECT COUNT(*) AS n FROM core.projects WHERE status = 'active'")
+            projects_active = cur.fetchone()["n"]
+
+            cur.execute("SELECT COUNT(*) AS n FROM core.projects WHERE status = 'completed'")
+            projects_completed = cur.fetchone()["n"]
+
+            cur.execute(
+                "SELECT COALESCE(SUM(amount), 0) AS total FROM core.revenue_transactions WHERE revenue_type = 'AGENCY_SERVICE'"
+            )
+            revenue_total = cur.fetchone()["total"]
+
+            cur.execute(
+                "SELECT COALESCE(SUM(value), 0) AS total FROM core.proposals WHERE status = 'sent'"
+            )
+            pipeline_value = cur.fetchone()["total"]
+
+    return {
+        "leads_total": leads_total,
+        "leads_qualified": leads_qualified,
+        "proposals_total": proposals_total,
+        "proposals_accepted": proposals_accepted,
+        "projects_active": projects_active,
+        "projects_completed": projects_completed,
+        "revenue_total": revenue_total,
+        "pipeline_value": pipeline_value,
+    }
