@@ -18,15 +18,19 @@ from data.processing.promote_to_core import promote  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("evolure.workers.run_promotion")
 
-# Fase 2: só o Contela está ligado. Quando o Webstudio (ou outro Lab)
-# passar a alimentar dados, adiciona aqui mais entradas (source, entities)
-# em vez de espalhar isto por vários scripts.
-#
-# V2: "organizations" tem de vir SEMPRE primeiro - orders/stock/sales
-# resolvem organization_id contra core.organizations, por isso precisam
-# que as organizações já lá estejam.
+# Fase 2: Contela e Webstudio ligados. A ordem dentro de cada lista importa
+# quando há referências entre entidades (ex: leads precisam de clients já
+# promovidos). "revenue_recognition" não é uma entidade normal - é o passo
+# que transforma pagamentos concluídos em receita reconhecida.
 SOURCES_TO_PROMOTE: list[tuple[str, list[str]]] = [
     ("contela", ["organizations", "orders", "stock", "sales"]),
+    (
+        "webstudio",
+        [
+            "clients", "leads", "proposals", "contracts", "projects",
+            "invoices", "payments", "revenue_recognition", "expenses", "campaigns",
+        ],
+    ),
 ]
 
 

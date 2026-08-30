@@ -1,11 +1,13 @@
 type Overview = {
   leads_total: number;
-  leads_qualified: number;
+  leads_won: number;
   proposals_total: number;
   proposals_accepted: number;
   projects_active: number;
   projects_completed: number;
   revenue_total: number;
+  expenses_total: number;
+  profit_total: number;
   pipeline_value: number;
 };
 
@@ -31,7 +33,7 @@ export default async function WebstudioDashboard() {
 
   const stages = [
     { label: "Leads", value: overview?.leads_total },
-    { label: "Qualificados", value: overview?.leads_qualified },
+    { label: "Ganhos (WON)", value: overview?.leads_won },
     { label: "Propostas", value: overview?.proposals_total },
     { label: "Aceites", value: overview?.proposals_accepted },
     { label: "Projetos ativos", value: overview?.projects_active },
@@ -40,26 +42,26 @@ export default async function WebstudioDashboard() {
 
   return (
     <main
-      className={`page`}
+      className="page"
       style={{ fontFamily: "var(--font-display), system-ui" }}
     >
       <p className="eyebrow">Livro de bordo · Webstudio</p>
       <h1 className="title">Funil de Vendas</h1>
       <p className="scopeNote">
-        Receita aqui é receita PRÓPRIA da Evolure Labs (agência a fechar
+        Receita e lucro aqui são PRÓPRIOS da Evolure Labs (agência a fechar
         projetos) - diferente da atividade agregada de terceiros que vês no
         Executive Dashboard do Contela.
       </p>
 
       {!hasData && (
         <p className="emptyState">
-          Sem dados ainda — esta página já está ligada à estrutura certa (Lead →
-          Qualificado → Proposta → Projeto → Receita), só à espera do
-          backend/admin da Webstudio existir e ser ligado como fonte de dados.
+          Sem dados ainda — a estrutura já está ligada ao backend real da
+          Webstudio, só à espera da primeira ingestão trazer
+          leads/propostas/projetos.
         </p>
       )}
 
-      {/* Funil: Lead -> Qualified -> Proposal -> Accepted -> Project -> Completed */}
+      {/* Funil: Lead -> Won -> Proposal -> Accepted -> Project -> Completed */}
       <div className="grid">
         {stages.map((stage) => (
           <div key={stage.label} className="metricCard">
@@ -69,11 +71,21 @@ export default async function WebstudioDashboard() {
         ))}
       </div>
 
-      <p className="sectionLabel">Receita e pipeline</p>
+      <p className="sectionLabel">Receita, despesas e lucro</p>
       <div className="grid">
         <div className="metricCard">
-          <div className="metricLabel">Receita fechada</div>
+          <div className="metricLabel">Receita reconhecida</div>
           <div className="metricFigure">{fmt(overview?.revenue_total)} MZN</div>
+        </div>
+        <div className="metricCard">
+          <div className="metricLabel">Despesas</div>
+          <div className="metricFigure">
+            {fmt(overview?.expenses_total)} MZN
+          </div>
+        </div>
+        <div className="metricCard">
+          <div className="metricLabel">Lucro real</div>
+          <div className="metricFigure">{fmt(overview?.profit_total)} MZN</div>
         </div>
         <div className="metricCard">
           <div className="metricLabel">Pipeline (propostas enviadas)</div>

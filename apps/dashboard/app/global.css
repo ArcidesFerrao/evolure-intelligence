@@ -163,6 +163,9 @@
   margin: 0 auto;
 }
 
+.navigator {
+  margin-bottom: 1.5rem !important;
+}
 .eyebrow {
   font-size: 0.7rem;
   letter-spacing: 0.12em;

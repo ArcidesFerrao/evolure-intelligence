@@ -2,7 +2,7 @@ import React from "react";
 
 export default function Navigator() {
   return (
-    <nav className="navigator page my-1 flex gap-4 text-md">
+    <nav className="navigator page my-4 flex gap-4 text-md">
       <a href="/" style={{ color: "#666", textDecoration: "none" }}>
         Estado do sistema
       </a>

@@ -18,6 +18,7 @@ from enum import Enum
 
 from data.ingestion.base import DataSource
 from data.ingestion.contela.connector import ContelaConnector
+from data.ingestion.webstudio.connector import WebstudioConnector
 
 
 class LabStatus(str, Enum):
@@ -48,10 +49,13 @@ LAB_REGISTRY: dict[str, LabEntry] = {
     "webstudio": LabEntry(
         id="webstudio",
         name="Webstudio",
-        status=LabStatus.PLANNED,
-        connector=None,
-        entities=("campaigns", "leads", "proposals", "projects"),
-        notes="Schema core pronto (database/migrations/013). Aguarda backend/admin e connector.",
+        status=LabStatus.ACTIVE,
+        connector=WebstudioConnector,
+        entities=(
+            "clients", "leads", "proposals", "contracts", "projects",
+            "invoices", "payments", "expenses", "campaigns",
+        ),
+        notes="Ligado via leitura direta ao Postgres da Webstudio (schema operational).",
     ),
     "the_ject": LabEntry(
         id="the_ject",

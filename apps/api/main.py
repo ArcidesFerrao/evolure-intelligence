@@ -174,26 +174,26 @@ def list_tasks():
 
 @app.get("/webstudio/overview")
 def webstudio_overview():
-    """Funil da Webstudio. Tabelas vazias por agora (sem backend/connector
-    ligado ainda) - devolve zeros de propósito, não é erro."""
+    """Funil da Webstudio, com receita reconhecida e lucro real (receita -
+    despesas), agora que Payment/Expense estão ligados."""
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) AS n FROM core.leads")
             leads_total = cur.fetchone()["n"]
 
-            cur.execute("SELECT COUNT(*) AS n FROM core.leads WHERE qualification IS NOT NULL")
-            leads_qualified = cur.fetchone()["n"]
+            cur.execute("SELECT COUNT(*) AS n FROM core.leads WHERE status = 'WON'")
+            leads_won = cur.fetchone()["n"]
 
             cur.execute("SELECT COUNT(*) AS n FROM core.proposals")
             proposals_total = cur.fetchone()["n"]
 
-            cur.execute("SELECT COUNT(*) AS n FROM core.proposals WHERE status = 'accepted'")
+            cur.execute("SELECT COUNT(*) AS n FROM core.proposals WHERE status = 'ACCEPTED'")
             proposals_accepted = cur.fetchone()["n"]
 
-            cur.execute("SELECT COUNT(*) AS n FROM core.projects WHERE status = 'active'")
+            cur.execute("SELECT COUNT(*) AS n FROM core.projects WHERE status IN ('PLANNING', 'IN_PROGRESS')")
             projects_active = cur.fetchone()["n"]
 
-            cur.execute("SELECT COUNT(*) AS n FROM core.projects WHERE status = 'completed'")
+            cur.execute("SELECT COUNT(*) AS n FROM core.projects WHERE status = 'COMPLETED'")
             projects_completed = cur.fetchone()["n"]
 
             cur.execute(
@@ -201,18 +201,24 @@ def webstudio_overview():
             )
             revenue_total = cur.fetchone()["total"]
 
-            cur.execute(
-                "SELECT COALESCE(SUM(value), 0) AS total FROM core.proposals WHERE status = 'sent'"
-            )
+            cur.execute("SELECT COALESCE(SUM(amount), 0) AS total FROM core.expenses")
+            expenses_total = cur.fetchone()["total"]
+
+            cur.execute("SELECT COALESCE(SUM(total_amount), 0) AS total FROM core.proposals WHERE status = 'SENT'")
             pipeline_value = cur.fetchone()["total"]
+
+    revenue_total = float(revenue_total)
+    expenses_total = float(expenses_total)
 
     return {
         "leads_total": leads_total,
-        "leads_qualified": leads_qualified,
+        "leads_won": leads_won,
         "proposals_total": proposals_total,
         "proposals_accepted": proposals_accepted,
         "projects_active": projects_active,
         "projects_completed": projects_completed,
         "revenue_total": revenue_total,
+        "expenses_total": expenses_total,
+        "profit_total": revenue_total - expenses_total,
         "pipeline_value": pipeline_value,
     }
