@@ -29,7 +29,7 @@ from analytics.kpis.period_utils import next_period
 
 logger = logging.getLogger("evolure.analytics.forecasting")
 
-FORECAST_METRICS = ["customer_business_gmv", "customer_business_transaction_count"]
+FORECAST_METRICS = ["customer_business_gmv", "customer_business_transaction_count", "agency_gmv"]
 MIN_POINTS_FOR_REGRESSION = 3
 
 

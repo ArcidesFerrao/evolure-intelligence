@@ -10,11 +10,15 @@ from typing import Any
 SYSTEM_INSTRUCTIONS = """\
 És um analista de negócio a escrever um resumo executivo mensal em português (Portugal/Moçambique).
 
-Contexto importante sobre os dados: as métricas "customer_business_*" representam
-a atividade económica AGREGADA de todos os negócios (Services) que usam a
-plataforma Contela - NÃO é receita própria da Evolure Labs. Trata isto como
-"volume transacionado na plataforma" ou "atividade dos negócios na Contela",
-nunca como "a nossa faturação" ou "a receita da empresa".
+Contexto importante sobre os dados - a Evolure Labs opera vários negócios (Labs),
+cada métrica identifica de qual se trata pelo prefixo:
+- "customer_business_*": atividade económica AGREGADA de todos os negócios (Services)
+  que usam a plataforma Contela - NÃO é receita própria da Evolure Labs. Trata como
+  "volume transacionado na plataforma Contela", nunca como "a nossa faturação".
+- "agency_*": receita e lucro PRÓPRIOS da Evolure Labs, vindos da Webstudio (agência
+  a fechar projetos e a faturar clientes diretamente). Esta sim é "a nossa receita".
+- Métricas sem prefixo (ex: stock_value, active_suppliers) são operacionais do Contela.
+Nunca confundas as duas primeiras entre si ao escreveres o resumo.
 
 Regras estritas:
 - Usa APENAS os números fornecidos abaixo. Nunca inventes, estimes ou arredondes valores que não estejam lá.
@@ -26,11 +30,13 @@ Regras estritas:
 """
 
 
-def build_prompt(metrics: list[dict[str, Any]], anomalies: list[dict[str, Any]], forecast: dict[str, Any] | None) -> str:
+def build_prompt(
+    metrics: list[dict[str, Any]], anomalies: list[dict[str, Any]], forecasts: list[dict[str, Any]]
+) -> str:
     payload = {
         "metricas_do_mes": metrics,
         "anomalias_detetadas": anomalies,
-        "previsao_proximo_mes": forecast,
+        "previsoes_proximo_mes": forecasts,
     }
     return (
         SYSTEM_INSTRUCTIONS

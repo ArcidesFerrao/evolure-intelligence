@@ -35,6 +35,7 @@ from data.validation.rules import (
     validate_proposal,
     validate_sale,
     validate_stock,
+    validate_stock_snapshot,
 )
 
 logger = logging.getLogger("evolure.processing.promote")
@@ -43,6 +44,7 @@ ENTITY_VALIDATORS: dict[str, Callable[[dict[str, Any]], tuple[bool, str | None]]
     "organizations": validate_organization,
     "orders": validate_order,
     "stock": validate_stock,
+    "stock_snapshots": validate_stock_snapshot,
     "clients": validate_client,
     "leads": validate_lead,
     "proposals": validate_proposal,
@@ -59,6 +61,7 @@ STAGING_TABLE = {
     "orders": "staging.contela_orders",
     "stock": "staging.contela_stock",
     "sales": "staging.contela_sales",
+    "stock_snapshots": "staging.contela_stock_snapshots",
     "clients": "staging.webstudio_clients",
     "leads": "staging.webstudio_leads",
     "proposals": "staging.webstudio_proposals",
@@ -74,6 +77,7 @@ CORE_TABLE = {
     "organizations": "core.organizations",
     "orders": "core.orders",
     "stock": "core.stock",
+    "stock_snapshots": "core.stock_snapshots",
     "clients": "core.clients",
     "leads": "core.leads",
     "proposals": "core.proposals",
@@ -99,6 +103,9 @@ CORE_COLUMNS = {
     "stock": [
         "source", "source_external_id", "organization_id", "product_name", "quantity",
         "cost", "critical", "supplier_name", "updated_at_source",
+    ],
+    "stock_snapshots": [
+        "source", "source_external_id", "organization_id", "stock_id", "quantity", "recorded_at",
     ],
     "clients": ["source", "source_external_id", "name", "email", "phone", "company", "tax_id", "created_at_source"],
     "leads": [
@@ -151,6 +158,9 @@ STAGING_TO_CORE_FIELD = {
         "external_id": "source_external_id", "product_name": "product_name", "quantity": "quantity",
         "cost": "cost", "critical": "critical", "supplier_name": "supplier_name",
         "updated_at_source": "updated_at_source",
+    },
+    "stock_snapshots": {
+        "external_id": "source_external_id", "quantity": "quantity", "recorded_at": "recorded_at",
     },
     "clients": {
         "external_id": "source_external_id", "name": "name", "email": "email", "phone": "phone",
@@ -206,6 +216,10 @@ REFERENCE_FIELDS: dict[str, list[tuple[str, str, str]]] = {
         ("supplier_organization_external_id", "supplier_organization_id", "core.organizations"),
     ],
     "stock": [("organization_external_id", "organization_id", "core.organizations")],
+    "stock_snapshots": [
+        ("organization_external_id", "organization_id", "core.organizations"),
+        ("stock_item_external_id", "stock_id", "core.stock"),
+    ],
     "leads": [("client_external_id", "client_id", "core.clients")],
     "proposals": [
         ("client_external_id", "client_id", "core.clients"),

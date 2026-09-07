@@ -3,6 +3,9 @@ import React from "react";
 export default function Navigator() {
   return (
     <nav className="navigator page my-4 flex gap-4 text-md">
+      <a href="/overview" style={{ color: "#666", textDecoration: "none" }}>
+        Visão Geral
+      </a>
       <a href="/" style={{ color: "#666", textDecoration: "none" }}>
         Estado do sistema
       </a>

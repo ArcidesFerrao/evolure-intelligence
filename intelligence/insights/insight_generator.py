@@ -46,17 +46,16 @@ def _get_anomalies(conn: psycopg.Connection, period: str) -> list[dict[str, Any]
         return [dict(r) for r in cur.fetchall()]
 
 
-def _get_forecast(conn: psycopg.Connection, period: str) -> dict[str, Any] | None:
+def _get_forecasts(conn: psycopg.Connection, period: str) -> list[dict[str, Any]]:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
             SELECT metric, predicted_value, confidence, model
-            FROM analytics.forecasts WHERE forecast_period = %s AND metric = 'customer_business_gmv'
+            FROM analytics.forecasts WHERE forecast_period = %s
             """,
             (period,),
         )
-        row = cur.fetchone()
-        return dict(row) if row else None
+        return [dict(r) for r in cur.fetchall()]
 
 
 def _save_insight(conn: psycopg.Connection, period: str, insight_text: str, snapshot: dict[str, Any], model: str) -> None:
@@ -87,12 +86,12 @@ def run(dsn: str, period: str | None = None) -> dict[str, Any] | None:
             return None
 
         anomalies = _get_anomalies(conn, period)
-        forecast = _get_forecast(conn, period)
+        forecasts = _get_forecasts(conn, period)
 
-        prompt = build_prompt(metrics, anomalies, forecast)
+        prompt = build_prompt(metrics, anomalies, forecasts)
         insight_text = generate_text(prompt)
 
-        snapshot = {"metrics": metrics, "anomalies": anomalies, "forecast": forecast}
+        snapshot = {"metrics": metrics, "anomalies": anomalies, "forecasts": forecasts}
         _save_insight(conn, period, insight_text, snapshot, model="gemini-3.6-flash")
         conn.commit()
 

@@ -1,18 +1,21 @@
 """
-InventoryAnalyzer - duas famílias de métricas com naturezas diferentes:
+InventoryAnalyzer - três famílias de métricas com naturezas diferentes:
 
 1) Métricas de SNAPSHOT (stock_value, low_stock_count, out_of_stock_count,
    total_skus) - vêm de core.stock, que é sempre uma fotografia do estado
    ATUAL (upsert por item, sem histórico). Sem comparação com "mês
    anterior" (change fica None) - é o estado agora, não uma variação.
 
-   O Contela tem um model StockSnapshot que guardaria histórico de stock ao
-   longo do tempo; quando isso for ligado, dá para calcular tendência real.
-
 2) active_suppliers - vem de core.orders (que TEM data por evento), filtrado
-   por período, com comparação ao mês anterior - conta fornecedores
-   distintos que receberam pelo menos um pedido no período. Diferente das
-   métricas de snapshot, esta é comparável mês a mês como no SalesAnalyzer.
+   por período, com comparação ao mês anterior.
+
+3) stock_value_trend - reconstrói o valor de stock EM DATAS PASSADAS a
+   partir de core.stock_snapshots (histórico real, ligado via
+   StockSnapshot do Contela). Compara o valor no início deste período com
+   o valor no início do anterior - a primeira métrica de inventário com
+   tendência real, não só "o estado agora". Usa o custo ATUAL de cada item
+   (core.stock.cost) como aproximação - se o custo mudou entretanto, o
+   valor histórico reconstruído reflete o custo de hoje, não o da altura.
 """
 from __future__ import annotations
 
@@ -95,6 +98,28 @@ def _compute_active_suppliers(conn: psycopg.Connection, period: str) -> float:
     return float(row["active_suppliers"] or 0)
 
 
+def _compute_stock_value_at(conn: psycopg.Connection, as_of) -> float:
+    """Reconstrói o valor de stock numa data passada: para cada item, pega
+    no snapshot mais recente até essa data, multiplica pelo custo ATUAL
+    (core.stock.cost - aproximação, ver docstring do módulo)."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT COALESCE(SUM(latest.quantity * s.cost), 0) AS value
+            FROM (
+                SELECT DISTINCT ON (stock_id) stock_id, quantity
+                FROM core.stock_snapshots
+                WHERE recorded_at <= %s AND stock_id IS NOT NULL
+                ORDER BY stock_id, recorded_at DESC
+            ) latest
+            JOIN core.stock s ON s.id = latest.stock_id
+            """,
+            (as_of,),
+        )
+        row = cur.fetchone()
+    return float(row["value"] or 0)
+
+
 def run(dsn: str, period: str | None = None) -> list[dict[str, Any]]:
     """Calcula e grava as métricas de inventário/fornecedores para `period`
     ('YYYY-MM', default: mês atual)."""
@@ -123,6 +148,28 @@ def run(dsn: str, period: str | None = None) -> list[dict[str, Any]]:
         _save_period_metric(conn, "active_suppliers", current_suppliers, change, period, status)
         results.append(
             {"metric": "active_suppliers", "value": current_suppliers, "change": change, "period": period, "status": status}
+        )
+
+        # Tendência real de stock, reconstruída a partir de StockSnapshot -
+        # compara o valor no início deste mês com o início do anterior.
+        current_start, _ = period_bounds(period)
+        prev_start, _ = period_bounds(prev_period)
+        value_at_current_start = _compute_stock_value_at(conn, current_start)
+        value_at_prev_start = _compute_stock_value_at(conn, prev_start)
+        trend_change = (
+            (value_at_current_start - value_at_prev_start) / value_at_prev_start
+            if value_at_prev_start
+            else None
+        )
+        trend_status = status_for_change(trend_change)
+        _save_period_metric(
+            conn, "stock_value_trend", value_at_current_start, trend_change, period, trend_status
+        )
+        results.append(
+            {
+                "metric": "stock_value_trend", "value": value_at_current_start,
+                "change": trend_change, "period": period, "status": trend_status,
+            }
         )
 
         conn.commit()

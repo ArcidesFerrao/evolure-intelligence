@@ -11,6 +11,31 @@ type Overview = {
   pipeline_value: number;
 };
 
+type AnalyticsMetric = {
+  metric: string;
+  value: number;
+  change: number | null;
+  period: string;
+  status: "positive" | "negative" | "neutral";
+};
+
+const PERIOD_METRIC_LABELS: Record<string, string> = {
+  agency_gmv: "Receita reconhecida (mês)",
+  agency_profit: "Lucro real (mês)",
+  agency_avg_transaction_value: "Ticket médio",
+  new_leads_count: "Novos leads",
+  proposals_sent_count: "Propostas enviadas",
+  proposals_accepted_count: "Propostas aceites",
+  proposal_conversion_rate_pct: "Taxa de conversão",
+  projects_completed_count: "Projetos concluídos (mês)",
+};
+
+function growthClass(status: string): string {
+  if (status === "positive") return "positive";
+  if (status === "negative") return "negative";
+  return "neutral";
+}
+
 async function getApiJson<T>(path: string): Promise<T | null> {
   const apiUrl = process.env.API_INTERNAL_URL || "http://localhost:8000";
   try {
@@ -28,8 +53,14 @@ function fmt(value: number | undefined): string {
 }
 
 export default async function WebstudioDashboard() {
-  const overview = await getApiJson<Overview>("/webstudio/overview");
+  const [overview, metricsData] = await Promise.all([
+    getApiJson<Overview>("/webstudio/overview"),
+    getApiJson<{ metrics: AnalyticsMetric[] }>("/analytics/metrics"),
+  ]);
   const hasData = !!overview && overview.leads_total > 0;
+  const periodMetrics = (metricsData?.metrics ?? []).filter(
+    (m) => m.metric in PERIOD_METRIC_LABELS,
+  );
 
   const stages = [
     { label: "Leads", value: overview?.leads_total },
@@ -42,7 +73,7 @@ export default async function WebstudioDashboard() {
 
   return (
     <main
-      className="page"
+      className={`page`}
       style={{ fontFamily: "var(--font-display), system-ui" }}
     >
       <p className="eyebrow">Livro de bordo · Webstudio</p>
@@ -94,6 +125,30 @@ export default async function WebstudioDashboard() {
           </div>
         </div>
       </div>
+
+      <p className="sectionLabel">Tendência mensal</p>
+      {periodMetrics.length === 0 ? (
+        <p className="emptyState">Sem métricas do mês calculadas ainda.</p>
+      ) : (
+        <div className="grid">
+          {periodMetrics.map((m) => (
+            <div key={m.metric} className="metricCard">
+              <div className="metricLabel">
+                {PERIOD_METRIC_LABELS[m.metric] ?? m.metric}
+              </div>
+              <div className="metricFigure">{fmt(m.value)}</div>
+              <div
+                className={`growthTag ${growthClass(m.status)}`}
+                style={{ marginTop: "0.4rem", display: "inline-block" }}
+              >
+                {m.change != null
+                  ? `${(m.change * 100).toFixed(1)}% vs mês anterior`
+                  : "sem comparação"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

@@ -18,6 +18,7 @@ import run_promotion
 import run_analytics
 import run_inventory_analytics
 import run_customer_analytics
+import run_webstudio_analytics
 import run_anomaly_detection
 import run_forecasting
 import run_insight_generation
@@ -52,6 +53,10 @@ def run_cycle() -> None:
         run_customer_analytics.main()
     except Exception:
         logger.exception("run_customer_analytics falhou")
+    try:
+        run_webstudio_analytics.main()
+    except Exception:
+        logger.exception("run_webstudio_analytics falhou")
     try:
         run_anomaly_detection.main()
     except Exception:

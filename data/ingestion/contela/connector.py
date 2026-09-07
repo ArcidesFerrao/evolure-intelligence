@@ -88,6 +88,19 @@ ENTITY_QUERIES: dict[str, str] = {
         LEFT JOIN "Service" sv ON sv.id = s."serviceId"
         LEFT JOIN "Supplier" sup ON sup.id = s."supplierId"
     """,
+    # Histórico real de stock ao longo do tempo. StockSnapshot liga a
+    # ServiceStockItem (visão do StockItem dentro de uma Service), não
+    # diretamente ao StockItem - por isso o join extra.
+    "stock_snapshots": """
+        SELECT
+            ss.id                AS external_id,
+            ssi."serviceId"      AS organization_external_id,
+            ssi."stockItemId"    AS stock_item_external_id,
+            ss.quantity          AS quantity,
+            ss."recordedAt"      AS recorded_at
+        FROM "StockSnapshot" ss
+        JOIN "ServiceStockItem" ssi ON ssi.id = ss."serviceStockItemId"
+    """,
 }
 
 # entity -> tabela de destino em staging (Evolure Intelligence)
@@ -96,6 +109,7 @@ ENTITY_TARGET_TABLE: dict[str, str] = {
     "orders": "staging.contela_orders",
     "stock": "staging.contela_stock",
     "sales": "staging.contela_sales",
+    "stock_snapshots": "staging.contela_stock_snapshots",
 }
 
 # entity -> colunas esperadas na tabela de destino, na ordem em que
@@ -113,6 +127,9 @@ ENTITY_TARGET_COLUMNS: dict[str, list[str]] = {
     "sales": [
         "external_id", "organization_external_id", "sale_date", "total_amount",
         "cogs", "payment_type", "service_name", "supplier_name",
+    ],
+    "stock_snapshots": [
+        "external_id", "organization_external_id", "stock_item_external_id", "quantity", "recorded_at",
     ],
 }
 

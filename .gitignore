@@ -1,6 +1,9 @@
 # Env
 .env
 
+# Backups (contêm dados reais, incluindo potencialmente sensíveis)
+/backups/*.sql.gz
+
 # Node / Next.js
 node_modules/
 .next/

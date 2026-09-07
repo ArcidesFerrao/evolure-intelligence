@@ -23,7 +23,7 @@ logger = logging.getLogger("evolure.workers.run_promotion")
 # promovidos). "revenue_recognition" não é uma entidade normal - é o passo
 # que transforma pagamentos concluídos em receita reconhecida.
 SOURCES_TO_PROMOTE: list[tuple[str, list[str]]] = [
-    ("contela", ["organizations", "orders", "stock", "sales"]),
+    ("contela", ["organizations", "orders", "stock", "stock_snapshots", "sales"]),
     (
         "webstudio",
         [

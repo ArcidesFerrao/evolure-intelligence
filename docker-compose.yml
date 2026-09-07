@@ -109,5 +109,27 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+
+  # Backup automático - dump comprimido a cada BACKUP_INTERVAL_HOURS,
+  # gravado em ./backups (bind mount para o disco, sobrevive a `down -v`).
+  # Usa a própria imagem do Postgres, garante pg_dump da versão certa.
+  backup:
+    image: postgres:16-alpine
+    container_name: evolure_backup
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-evolure_dev_password}
+      POSTGRES_USER: ${POSTGRES_USER:-evolure}
+      POSTGRES_DB: ${POSTGRES_DB:-evolure_intelligence}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+      - ./scripts:/scripts:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["sh", "/scripts/backup.sh"]
+
 volumes:
   pgdata:
