@@ -155,21 +155,23 @@ def intelligence_insights():
     return {"insights": rows}
 
 
-@app.get("/tasks")
-def list_tasks():
-    """Fase 6 - tarefas geradas a partir dos insights, com o estado de automação."""
+@app.get("/task-proposals")
+def list_task_proposals():
+    """Fase 6 (v2) - propostas de tarefa geradas a partir dos insights.
+    Uma proposta só vira task real quando a Webstudio confirma (status
+    CREATED_IN_WEBSTUDIO); até lá, fica PROPOSED/ACCEPTED/REJECTED."""
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT id, title, description, priority, category, source,
-                       status, automation_type, expected_impact, period, created_at
-                FROM tasks.business_tasks
+                       status, expected_impact, period, webstudio_task_id, created_at
+                FROM actions.task_proposals
                 ORDER BY created_at DESC
                 """
             )
             rows = cur.fetchall()
-    return {"tasks": rows}
+    return {"task_proposals": rows}
 
 
 @app.get("/webstudio/overview")

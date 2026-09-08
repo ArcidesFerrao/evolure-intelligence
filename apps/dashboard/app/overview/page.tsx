@@ -16,7 +16,7 @@ type Insight = {
   insight_text: string;
 };
 
-type Task = {
+type TaskProposal = {
   priority: "low" | "medium" | "high";
   status: string;
 };
@@ -55,13 +55,13 @@ export default async function OverviewDashboard() {
     getApiJson<{ metrics: AnalyticsMetric[] }>("/analytics/metrics"),
     getApiJson<{ anomalies: Anomaly[] }>("/analytics/anomalies"),
     getApiJson<{ insights: Insight[] }>("/intelligence/insights"),
-    getApiJson<{ tasks: Task[] }>("/tasks"),
+    getApiJson<{ task_proposals: TaskProposal[] }>("/task-proposals"),
   ]);
 
   const metrics = metricsData?.metrics ?? [];
   const anomalies = anomalyData?.anomalies ?? [];
   const latestInsight = insightData?.insights?.[0];
-  const tasks = taskData?.tasks ?? [];
+  const tasks = taskData?.task_proposals ?? [];
 
   // Receita própria da Evolure Labs = só agency_* por agora (Webstudio).
   // Quando a Contela ligar faturação própria (platform_*), soma-se aqui.
@@ -82,7 +82,7 @@ export default async function OverviewDashboard() {
   );
   const webstudioProjects = findMetric(metrics, "projects_completed_count");
 
-  const tasksPending = tasks.filter((t) => t.status === "PENDING");
+  const tasksPending = tasks.filter((t) => t.status === "PROPOSED");
   const tasksByPriority = {
     high: tasksPending.filter((t) => t.priority === "high").length,
     medium: tasksPending.filter((t) => t.priority === "medium").length,

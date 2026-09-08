@@ -44,14 +44,14 @@ type Insight = {
   created_at: string;
 };
 
-type Task = {
+type TaskProposal = {
   id: number;
   title: string;
   description: string;
   priority: "low" | "medium" | "high";
   category: string;
   status: string;
-  automation_type: string | null;
+  webstudio_task_id: string | null;
   expected_impact: "low" | "medium" | "high";
   period: string | null;
 };
@@ -97,14 +97,14 @@ export default async function ExecutiveDashboard() {
       getApiJson<{ anomalies: Anomaly[] }>("/analytics/anomalies"),
       getApiJson<{ forecasts: Forecast[] }>("/analytics/forecasts"),
       getApiJson<{ insights: Insight[] }>("/intelligence/insights"),
-      getApiJson<{ tasks: Task[] }>("/tasks"),
+      getApiJson<{ task_proposals: TaskProposal[] }>("/task-proposals"),
     ]);
 
   const metrics = metricsData?.metrics ?? [];
   const anomalies = anomalyData?.anomalies ?? [];
   const forecasts = forecastData?.forecasts ?? [];
   const latestInsight = insightData?.insights?.[0];
-  const tasks = taskData?.tasks ?? [];
+  const tasks = taskData?.task_proposals ?? [];
 
   const revenue = findMetric(metrics, "customer_business_gmv");
   const margin = findMetric(metrics, "customer_business_gross_margin");

@@ -1,10 +1,14 @@
 """
 Task Generator (Fase 6) - lê o insight mais recente (Fase 5) e gera uma
-tarefa concreta em tasks.business_tasks.
+proposta de tarefa em actions.task_proposals.
 
-Fluxo: Insight -> Recommendation (implícito no prompt) -> Task.
+Fluxo: Insight -> Recommendation (implícito no prompt) -> Task Proposal.
+Isto NÃO cria uma tarefa real - fica como proposta (status PROPOSED) até
+um humano a aceitar e ela ser confirmada na Webstudio (que passa a ser
+status CREATED_IN_WEBSTUDIO). Ver database/migrations/016_actions_schema.sql.
+
 Idempotente por (source, period): correr o scheduler várias vezes no
-mesmo mês não gera tarefas duplicadas (ON CONFLICT actualiza a existente).
+mesmo mês não gera propostas duplicadas (ON CONFLICT actualiza a existente).
 """
 from __future__ import annotations
 
@@ -40,9 +44,9 @@ def _save_task(conn: psycopg.Connection, period: str, task: dict[str, Any]) -> N
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO tasks.business_tasks
+            INSERT INTO actions.task_proposals
                 (title, description, priority, category, source, status, expected_impact, period)
-            VALUES (%s, %s, %s, %s, %s, 'PENDING', %s, %s)
+            VALUES (%s, %s, %s, %s, %s, 'PROPOSED', %s, %s)
             ON CONFLICT (source, period) DO UPDATE
                 SET title = EXCLUDED.title, description = EXCLUDED.description,
                     priority = EXCLUDED.priority, category = EXCLUDED.category,

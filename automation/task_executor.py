@@ -1,16 +1,25 @@
 """
-Automation Engine (Fase 6) - decide se uma tarefa pode ser executada
+Automation Engine (Fase 6, v2) - decide se uma task_proposal já confirmada
+na Webstudio (status = CREATED_IN_WEBSTUDIO) pode ser executada
 automaticamente ou precisa de um humano.
 
 IMPORTANTE: neste momento não há nenhuma integração real ligada (sem envio
 de email, sem RPA, sem APIs externas configuradas - as pastas automation/
 email, notifications, api, rpa existem desde a Fase 1 mas estão vazias).
-Por isso AUTOMATION_HANDLERS está vazio de propósito: toda a tarefa cai em
-"manual" até haver um handler real registado aqui.
+Por isso AUTOMATION_HANDLERS está vazio de propósito: toda a proposta cai
+em decision="HUMAN" até haver um handler real registado aqui.
 
 Isto não é uma limitação a esconder - é o estado honesto da automação.
 Quando ligares, por exemplo, envio de email (automation/email/), regista
 um handler aqui: AUTOMATION_HANDLERS["send_weekly_report"] = send_email_fn
+
+REGRA CENTRAL DA ARQUITETURA v3: "Labs Task -> Automation está proibido."
+Isto só processa task_proposals com status = CREATED_IN_WEBSTUDIO - ou
+seja, propostas que já viraram uma task real confirmada pela Webstudio
+(webstudio_task_id preenchido). Uma proposta ainda em PROPOSED/ACCEPTED
+nunca passa por aqui. Enquanto o fluxo de aceitação (Webstudio <- Labs,
+W8/L4) não estiver ligado, esta função não encontra nada para processar -
+o que é o comportamento correto, não um bug.
 """
 from __future__ import annotations
 
@@ -22,52 +31,99 @@ from psycopg.rows import dict_row
 
 logger = logging.getLogger("evolure.automation.task_executor")
 
-# category/automation_type -> função que executa a tarefa automaticamente.
-# Vazio por agora - ver docstring acima.
+# category -> função que executa a automação. Vazio por agora - ver docstring acima.
 AUTOMATION_HANDLERS: dict[str, Callable[[dict[str, Any]], bool]] = {}
 
 
-def decide_automation_type(task: dict[str, Any]) -> str:
-    """Decide se a tarefa tem um handler automático registado. Devolve o
-    nome do handler se existir, ou "manual" caso contrário."""
-    category = (task.get("category") or "").lower().strip()
+def decide_automation(task_proposal: dict[str, Any]) -> tuple[str, str | None]:
+    """Decide se a proposta tem um handler automático registado.
+    Devolve (decision, automation_type): decision é "AUTOMATION" ou "HUMAN";
+    automation_type só é preenchido quando decision = "AUTOMATION"."""
+    category = (task_proposal.get("category") or "").lower().strip()
     if category in AUTOMATION_HANDLERS:
-        return category
-    return "manual"
+        return "AUTOMATION", category
+    return "HUMAN", None
 
 
-def process_pending_tasks(dsn: str) -> dict[str, int]:
-    """Percorre tarefas PENDING, marca automation_type, e executa as que
-    tiverem handler registado (hoje, nenhuma). Devolve contagens."""
-    processed = {"automated": 0, "manual": 0}
+def process_confirmed_proposals(dsn: str) -> dict[str, int]:
+    """Percorre task_proposals com status=CREATED_IN_WEBSTUDIO que ainda não
+    têm automation_proposals associada, decide HUMAN/AUTOMATION, e executa
+    as que tiverem handler registado (hoje, nenhuma). Devolve contagens."""
+    processed = {"automated": 0, "human": 0}
 
     with psycopg.connect(dsn) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                "SELECT id, title, category FROM tasks.business_tasks WHERE status = 'PENDING' AND automation_type IS NULL"
+                """
+                SELECT tp.id, tp.title, tp.category, tp.webstudio_task_id
+                FROM actions.task_proposals tp
+                LEFT JOIN actions.automation_proposals ap ON ap.task_proposal_id = tp.id
+                WHERE tp.status = 'CREATED_IN_WEBSTUDIO' AND ap.id IS NULL
+                """
             )
             pending = cur.fetchall()
 
-        for task in pending:
-            automation_type = decide_automation_type(task)
-            handler = AUTOMATION_HANDLERS.get(automation_type)
+        for proposal in pending:
+            decision, automation_type = decide_automation(proposal)
 
-            with conn.cursor() as cur:
-                if handler:
-                    success = handler(task)
-                    new_status = "AUTOMATED" if success else "PENDING"
-                    cur.execute(
-                        "UPDATE tasks.business_tasks SET automation_type = %s, status = %s, updated_at = now() WHERE id = %s",
-                        (automation_type, new_status, task["id"]),
-                    )
-                    processed["automated"] += 1 if success else 0
-                else:
-                    cur.execute(
-                        "UPDATE tasks.business_tasks SET automation_type = 'manual', updated_at = now() WHERE id = %s",
-                        (task["id"],),
-                    )
-                    processed["manual"] += 1
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(
+                    """
+                    INSERT INTO actions.automation_proposals (task_proposal_id, decision, automation_type)
+                    VALUES (%s, %s, %s)
+                    RETURNING id
+                    """,
+                    (proposal["id"], decision, automation_type),
+                )
+                automation_proposal_id = cur.fetchone()["id"]
+
+            if decision == "AUTOMATION":
+                handler = AUTOMATION_HANDLERS[automation_type]
+                _execute(conn, automation_proposal_id, handler, proposal)
+                processed["automated"] += 1
+            else:
+                processed["human"] += 1
+
         conn.commit()
 
-    logger.info("Automation Engine: %d automatizadas, %d marcadas para humano.", processed["automated"], processed["manual"])
+    logger.info(
+        "Automation Engine: %d automatizadas, %d marcadas para humano.",
+        processed["automated"],
+        processed["human"],
+    )
     return processed
+
+
+def _execute(
+    conn: psycopg.Connection,
+    automation_proposal_id: int,
+    handler: Callable[[dict[str, Any]], bool],
+    proposal: dict[str, Any],
+) -> None:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            "INSERT INTO actions.execution_requests (automation_proposal_id, status) VALUES (%s, 'RUNNING') RETURNING id",
+            (automation_proposal_id,),
+        )
+        execution_request_id = cur.fetchone()["id"]
+
+    try:
+        success = handler(proposal)
+        error_message = None
+    except Exception as exc:  # handler pode lançar - regista como falha, não derruba o worker
+        success = False
+        error_message = str(exc)
+        logger.exception("Handler de automação falhou para proposal %s", proposal["id"])
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE actions.execution_requests SET status = %s WHERE id = %s",
+            ("DONE" if success else "FAILED", execution_request_id),
+        )
+        cur.execute(
+            """
+            INSERT INTO actions.execution_results (execution_request_id, success, error_message)
+            VALUES (%s, %s, %s)
+            """,
+            (execution_request_id, success, error_message),
+        )
