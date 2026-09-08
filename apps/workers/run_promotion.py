@@ -29,6 +29,7 @@ SOURCES_TO_PROMOTE: list[tuple[str, list[str]]] = [
         [
             "clients", "leads", "proposals", "contracts", "projects",
             "invoices", "payments", "revenue_recognition", "expenses", "campaigns",
+            "development_events",
         ],
     ),
 ]

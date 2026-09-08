@@ -11,6 +11,7 @@ que foi removido na reorganização v3 do backend da Webstudio.
 """
 from __future__ import annotations
 
+import json
 import os
 from typing import Any
 
@@ -79,6 +80,13 @@ ENTITY_QUERIES: dict[str, str] = {
                "createdAt" AS created_at_source
         FROM commercial.campaigns
     """,
+    "development_events": """
+        SELECT id AS external_id, source::text AS event_source, "eventType"::text AS event_type,
+               "userId" AS user_external_id, "projectId" AS project_external_id,
+               "taskId" AS task_external_id, "externalId" AS external_ref,
+               metadata, timestamp AS occurred_at, "createdAt" AS created_at_source
+        FROM development.development_events
+    """,
 }
 
 ENTITY_TARGET_TABLE: dict[str, str] = {
@@ -91,6 +99,7 @@ ENTITY_TARGET_TABLE: dict[str, str] = {
     "payments": "staging.webstudio_payments",
     "expenses": "staging.webstudio_expenses",
     "campaigns": "staging.webstudio_campaigns",
+    "development_events": "staging.webstudio_development_events",
 }
 
 ENTITY_TARGET_COLUMNS: dict[str, list[str]] = {
@@ -125,6 +134,10 @@ ENTITY_TARGET_COLUMNS: dict[str, list[str]] = {
     "campaigns": [
         "external_id", "name", "channel", "budget", "status", "start_date", "end_date",
         "impressions", "clicks", "leads_count", "conversions", "created_at_source",
+    ],
+    "development_events": [
+        "external_id", "event_source", "event_type", "user_external_id", "project_external_id",
+        "task_external_id", "external_ref", "metadata", "occurred_at", "created_at_source",
     ],
 }
 
@@ -167,6 +180,8 @@ class WebstudioConnector(DataSource):
         for record in raw_records:
             clean = dict(record)
             clean["external_id"] = str(clean["external_id"])
+            if "metadata" in clean and clean["metadata"] is not None:
+                clean["metadata"] = json.dumps(clean["metadata"], default=str)
             cleaned.append(clean)
         return cleaned
 

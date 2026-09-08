@@ -25,6 +25,7 @@ from data.validation.rules import (
     validate_campaign,
     validate_client,
     validate_contract,
+    validate_development_event,
     validate_expense,
     validate_invoice,
     validate_lead,
@@ -54,6 +55,7 @@ ENTITY_VALIDATORS: dict[str, Callable[[dict[str, Any]], tuple[bool, str | None]]
     "payments": validate_payment,
     "expenses": validate_expense,
     "campaigns": validate_campaign,
+    "development_events": validate_development_event,
 }
 
 STAGING_TABLE = {
@@ -71,6 +73,7 @@ STAGING_TABLE = {
     "payments": "staging.webstudio_payments",
     "expenses": "staging.webstudio_expenses",
     "campaigns": "staging.webstudio_campaigns",
+    "development_events": "staging.webstudio_development_events",
 }
 
 CORE_TABLE = {
@@ -87,6 +90,7 @@ CORE_TABLE = {
     "payments": "core.payments",
     "expenses": "core.expenses",
     "campaigns": "core.wstudio_campaigns",
+    "development_events": "core.development_events",
 }
 
 CORE_CONFLICT_COLUMNS = {
@@ -138,6 +142,10 @@ CORE_COLUMNS = {
     "campaigns": [
         "source", "source_external_id", "name", "channel", "budget", "status", "start_date", "end_date",
         "impressions", "clicks", "leads_count", "conversions", "created_at_source",
+    ],
+    "development_events": [
+        "source", "source_external_id", "event_source", "event_type", "user_external_id",
+        "project_id", "task_external_id", "external_ref", "metadata", "occurred_at", "created_at_source",
     ],
 }
 
@@ -205,6 +213,12 @@ STAGING_TO_CORE_FIELD = {
         "impressions": "impressions", "clicks": "clicks", "leads_count": "leads_count",
         "conversions": "conversions", "created_at_source": "created_at_source",
     },
+    "development_events": {
+        "external_id": "source_external_id", "event_source": "event_source", "event_type": "event_type",
+        "user_external_id": "user_external_id", "task_external_id": "task_external_id",
+        "external_ref": "external_ref", "metadata": "metadata",
+        "occurred_at": "occurred_at", "created_at_source": "created_at_source",
+    },
 }
 
 # entidade -> lista de (campo em staging, campo em core, tabela core a
@@ -239,6 +253,7 @@ REFERENCE_FIELDS: dict[str, list[tuple[str, str, str]]] = {
     ],
     "payments": [("invoice_external_id", "invoice_id", "core.invoices")],
     "expenses": [("project_external_id", "project_id", "core.projects")],
+    "development_events": [("project_external_id", "project_id", "core.projects")],
 }
 
 
@@ -287,6 +302,9 @@ def _promote_generic(entity: str, source: str, conn: psycopg.Connection) -> dict
         core_record: dict[str, Any] = {"source": source}
         for staging_field, core_field in field_map.items():
             core_record[core_field] = row.get(staging_field)
+
+        if core_record.get("metadata") is not None:
+            core_record["metadata"] = json.dumps(core_record["metadata"], default=str)
 
         for staging_field, core_field, ref_table in reference_fields:
             core_record[core_field] = _resolve_ref(conn, source, ref_table, row.get(staging_field))

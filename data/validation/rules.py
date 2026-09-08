@@ -135,6 +135,14 @@ def validate_campaign(record: dict[str, Any]) -> tuple[bool, str | None]:
     return True, None
 
 
+def validate_development_event(record: dict[str, Any]) -> tuple[bool, str | None]:
+    if not record.get("event_type"):
+        return False, "event_type em falta"
+    if not record.get("occurred_at"):
+        return False, "occurred_at em falta"
+    return True, None
+
+
 def validate_stock_snapshot(record: dict[str, Any]) -> tuple[bool, str | None]:
     quantity = record.get("quantity")
     if quantity is None:

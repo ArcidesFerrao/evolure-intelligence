@@ -53,9 +53,9 @@ LAB_REGISTRY: dict[str, LabEntry] = {
         connector=WebstudioConnector,
         entities=(
             "clients", "leads", "proposals", "contracts", "projects",
-            "invoices", "payments", "expenses", "campaigns",
+            "invoices", "payments", "expenses", "campaigns", "development_events",
         ),
-        notes="Ligado via leitura direta ao Postgres da Webstudio (schema operational).",
+        notes="Ligado via leitura direta ao Postgres da Webstudio (schemas shared/commercial/delivery/development).",
     ),
     "the_ject": LabEntry(
         id="the_ject",
