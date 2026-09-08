@@ -1,12 +1,13 @@
 """
-WebstudioConnector - liga-se diretamente ao PostgreSQL da Webstudio
-(schema "operational") e escreve os dados normalizados em staging.* na
-base do Evolure Intelligence.
+WebstudioConnector - liga-se diretamente ao PostgreSQL da Webstudio e
+escreve os dados normalizados em staging.* na base do Evolure Intelligence.
 
 Mesma forma do ContelaConnector. Os campos aqui batem certo com o
-schema.prisma real da Webstudio (multiSchema: operational + integration -
-por agora lemos "operational" diretamente; se um dia "integration" ganhar
-views próprias para isto, troca-se só as queries abaixo).
+schema.prisma real da Webstudio (multiSchema: shared/commercial/delivery/
+development/integration/reporting - por agora lemos os schemas de domínio
+diretamente; se um dia "integration" ganhar views próprias para isto, troca-
+-se só as queries abaixo). Não confundir com o schema "operational" antigo,
+que foi removido na reorganização v3 do backend da Webstudio.
 """
 from __future__ import annotations
 
@@ -22,51 +23,51 @@ ENTITY_QUERIES: dict[str, str] = {
     "clients": """
         SELECT id AS external_id, name, email, phone, company,
                "taxId" AS tax_id, "createdAt" AS created_at_source
-        FROM operational.clients
+        FROM shared.clients
     """,
     "leads": """
         SELECT id AS external_id, "clientId" AS client_external_id,
                name, email, phone, company, source AS lead_source,
                status::text AS status, "createdAt" AS created_at_source
-        FROM operational.leads
+        FROM commercial.leads
     """,
     "proposals": """
         SELECT id AS external_id, "clientId" AS client_external_id, "leadId" AS lead_external_id,
                title, "totalAmount" AS total_amount, status::text AS status,
                "validUntil" AS valid_until, "sentAt" AS sent_at, "respondedAt" AS responded_at,
                "createdAt" AS created_at_source
-        FROM operational.proposals
+        FROM commercial.proposals
     """,
     "contracts": """
         SELECT id AS external_id, "clientId" AS client_external_id, "proposalId" AS proposal_external_id,
                title, value, "startDate" AS start_date, "endDate" AS end_date,
                status::text AS status, "signedAt" AS signed_at, "createdAt" AS created_at_source
-        FROM operational.contracts
+        FROM commercial.contracts
     """,
     "projects": """
         SELECT id AS external_id, "clientId" AS client_external_id, "contractId" AS contract_external_id,
                name, status::text AS status, budget,
                "startDate" AS start_date, "dueDate" AS due_date, "completedAt" AS completed_at,
                "createdAt" AS created_at_source
-        FROM operational.projects
+        FROM delivery.projects
     """,
     "invoices": """
         SELECT id AS external_id, "clientId" AS client_external_id, "projectId" AS project_external_id,
                number, subtotal, tax, total, status::text AS status,
                "dueDate" AS due_date, "paidAt" AS paid_at, "createdAt" AS created_at_source
-        FROM operational.invoices
+        FROM commercial.invoices
     """,
     "payments": """
         SELECT id AS external_id, "invoiceId" AS invoice_external_id,
                amount, method::text AS method, status::text AS status,
                "paidAt" AS paid_at, "createdAt" AS created_at_source
-        FROM operational.payments
+        FROM commercial.payments
     """,
     "expenses": """
         SELECT id AS external_id, "projectId" AS project_external_id,
                category::text AS category, description, amount,
                date AS expense_date, "createdAt" AS created_at_source
-        FROM operational.expenses
+        FROM commercial.expenses
     """,
     "campaigns": """
         SELECT id AS external_id, name, channel, budget, status::text AS status,
@@ -76,7 +77,7 @@ ENTITY_QUERIES: dict[str, str] = {
                (metrics->>'leads')::int AS leads_count,
                (metrics->>'conversions')::int AS conversions,
                "createdAt" AS created_at_source
-        FROM operational.campaigns
+        FROM commercial.campaigns
     """,
 }
 
