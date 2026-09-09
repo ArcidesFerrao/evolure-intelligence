@@ -19,6 +19,54 @@ type AnalyticsMetric = {
   status: "positive" | "negative" | "neutral";
 };
 
+type DevelopmentEventTypeCount = {
+  event_type: string;
+  n: number;
+};
+
+type RecentDevelopmentEvent = {
+  event_type: string;
+  event_source: string | null;
+  external_ref: string | null;
+  occurred_at: string;
+};
+
+type DevelopmentActivity = {
+  total_events: number;
+  events_last_7_days: number;
+  by_type: DevelopmentEventTypeCount[];
+  recent: RecentDevelopmentEvent[];
+};
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  COMMIT: "Commit",
+  BRANCH_CREATED: "Branch criado",
+  BRANCH_SWITCHED: "Branch alterado",
+  PR_CREATED: "Pull Request criado",
+  PR_MERGED: "Pull Request integrado",
+  DEPLOYMENT: "Deploy",
+  BUILD_STARTED: "Build iniciado",
+  BUILD_FAILED: "Build falhou",
+  BUILD_SUCCEEDED: "Build concluído",
+  TASK_STARTED: "Tarefa iniciada",
+  TASK_COMPLETED: "Tarefa concluída",
+  BLOCKER_RAISED: "Bloqueio reportado",
+  BLOCKER_RESOLVED: "Bloqueio resolvido",
+  INTERRUPTION: "Interrupção",
+  DECISION_LOGGED: "Decisão registada",
+  FOCUS_ACTIVITY: "Atividade de foco",
+  MANUAL_ACTIVITY: "Atividade manual",
+};
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("pt-PT", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 const PERIOD_METRIC_LABELS: Record<string, string> = {
   agency_gmv: "Receita reconhecida (mês)",
   agency_profit: "Lucro real (mês)",
@@ -53,9 +101,10 @@ function fmt(value: number | undefined): string {
 }
 
 export default async function WebstudioDashboard() {
-  const [overview, metricsData] = await Promise.all([
+  const [overview, metricsData, devActivity] = await Promise.all([
     getApiJson<Overview>("/webstudio/overview"),
     getApiJson<{ metrics: AnalyticsMetric[] }>("/analytics/metrics"),
+    getApiJson<DevelopmentActivity>("/webstudio/development-activity"),
   ]);
   const hasData = !!overview && overview.leads_total > 0;
   const periodMetrics = (metricsData?.metrics ?? []).filter(
@@ -148,6 +197,50 @@ export default async function WebstudioDashboard() {
             </div>
           ))}
         </div>
+      )}
+      <p className="sectionLabel">Atividade de Desenvolvimento</p>
+      {!devActivity || devActivity.total_events === 0 ? (
+        <p className="emptyState">
+          Sem eventos de desenvolvimento ainda — o Development Lab (commits,
+          PRs, builds) ainda não gerou dados, ou a ingestão/promoção ainda
+          não correu.
+        </p>
+      ) : (
+        <>
+          <div className="grid">
+            <div className="metricCard">
+              <div className="metricLabel">Eventos (total)</div>
+              <div className="metricFigure">{fmt(devActivity.total_events)}</div>
+            </div>
+            <div className="metricCard">
+              <div className="metricLabel">Eventos (últimos 7 dias)</div>
+              <div className="metricFigure">
+                {fmt(devActivity.events_last_7_days)}
+              </div>
+            </div>
+            {devActivity.by_type.slice(0, 4).map((t) => (
+              <div key={t.event_type} className="metricCard">
+                <div className="metricLabel">
+                  {EVENT_TYPE_LABELS[t.event_type] ?? t.event_type}
+                </div>
+                <div className="metricFigure">{fmt(t.n)}</div>
+              </div>
+            ))}
+          </div>
+
+          <p className="sectionLabel">Eventos recentes</p>
+          <div className="insightText">
+            {devActivity.recent.map((ev, i) => (
+              <div key={i} style={{ marginBottom: "0.5rem" }}>
+                <strong>{EVENT_TYPE_LABELS[ev.event_type] ?? ev.event_type}</strong>
+                {ev.external_ref ? ` — ${ev.external_ref}` : ""}
+                {" · "}
+                {formatDateTime(ev.occurred_at)}
+                {ev.event_source ? ` · ${ev.event_source}` : ""}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </main>
   );

@@ -224,3 +224,47 @@ def webstudio_overview():
         "profit_total": revenue_total - expenses_total,
         "pipeline_value": pipeline_value,
     }
+
+
+@app.get("/webstudio/development-activity")
+def webstudio_development_activity():
+    """Atividade do Development Lab (L3) - commits, PRs, builds etc. já
+    promovidos de core.development_events. Não confundir com o funil
+    comercial de webstudio_overview - isto é sobre o próprio trabalho de
+    desenvolvimento, não sobre clientes/receita."""
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS n FROM core.development_events")
+            total_events = cur.fetchone()["n"]
+
+            cur.execute(
+                "SELECT COUNT(*) AS n FROM core.development_events WHERE occurred_at >= now() - interval '7 days'"
+            )
+            events_last_7_days = cur.fetchone()["n"]
+
+            cur.execute(
+                """
+                SELECT event_type, COUNT(*) AS n
+                FROM core.development_events
+                GROUP BY event_type
+                ORDER BY n DESC
+                """
+            )
+            by_type = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT event_type, event_source, external_ref, occurred_at
+                FROM core.development_events
+                ORDER BY occurred_at DESC
+                LIMIT 10
+                """
+            )
+            recent = cur.fetchall()
+
+    return {
+        "total_events": total_events,
+        "events_last_7_days": events_last_7_days,
+        "by_type": by_type,
+        "recent": recent,
+    }
