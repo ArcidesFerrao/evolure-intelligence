@@ -35,12 +35,15 @@ services:
 
   api:
     build:
-      context: ./apps/api
+      context: .
+      dockerfile: apps/api/Dockerfile
     container_name: evolure_api
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-evolure}:${POSTGRES_PASSWORD:-evolure_dev_password}@postgres:5432/${POSTGRES_DB:-evolure_intelligence}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change_me_dev_key}
+      WEBSTUDIO_API_URL: ${WEBSTUDIO_API_URL:-}
+      WEBSTUDIO_API_KEY: ${WEBSTUDIO_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:

@@ -13,6 +13,9 @@ from contextlib import asynccontextmanager
 import psycopg
 from fastapi import FastAPI, Header, HTTPException
 from psycopg.rows import dict_row
+from pydantic import BaseModel
+
+from actions import task_proposal_engine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("evolure.api")
@@ -172,6 +175,34 @@ def list_task_proposals():
             )
             rows = cur.fetchall()
     return {"task_proposals": rows}
+
+
+class RejectProposalBody(BaseModel):
+    reason: str | None = None
+
+
+@app.post("/task-proposals/{proposal_id}/accept")
+def accept_task_proposal(proposal_id: int):
+    """PROPOSED -> ACCEPTED, com tentativa best-effort de criar a task
+    real na Webstudio (ver actions/task_proposal_engine.py). A resposta
+    inclui sempre "webstudio_sync" a dizer o que realmente aconteceu."""
+    try:
+        return task_proposal_engine.accept(DATABASE_URL, proposal_id)
+    except task_proposal_engine.ProposalNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except task_proposal_engine.InvalidTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@app.post("/task-proposals/{proposal_id}/reject")
+def reject_task_proposal(proposal_id: int, body: RejectProposalBody = RejectProposalBody()):
+    """PROPOSED -> REJECTED."""
+    try:
+        return task_proposal_engine.reject(DATABASE_URL, proposal_id, body.reason)
+    except task_proposal_engine.ProposalNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except task_proposal_engine.InvalidTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @app.get("/webstudio/overview")
