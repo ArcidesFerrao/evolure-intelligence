@@ -113,7 +113,7 @@ def _try_push_to_webstudio(dsn: str, proposal: dict[str, Any]) -> dict[str, Any]
             timeout=10,
         )
         resp.raise_for_status()
-        webstudio_task_id = resp.json().get("id")
+        webstudio_task_id = resp.json().get("data", {}).get("id")
     except Exception as exc:
         logger.exception("Falha ao empurrar proposta %d para a Webstudio", proposal["id"])
         return {**proposal, "webstudio_sync": "failed", "webstudio_sync_error": str(exc)}
