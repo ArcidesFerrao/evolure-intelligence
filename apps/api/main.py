@@ -7,6 +7,7 @@ Nada de lógica de negócio aqui ainda - isso entra na Fase 2 (Data Hub)
 e Fase 3 (Analytics Engine).
 """
 import os
+import sys
 import logging
 from contextlib import asynccontextmanager
 
@@ -15,7 +16,13 @@ from fastapi import FastAPI, Header, HTTPException
 from psycopg.rows import dict_row
 from pydantic import BaseModel
 
-from actions import task_proposal_engine
+# WORKDIR do container é /monorepo/apps/api - isso NÃO põe /monorepo no
+# sys.path automaticamente (só a própria pasta entra via CWD). Sem isto,
+# "from actions import ..." falha com ModuleNotFoundError mesmo com o
+# volume montado e o ficheiro presente no disco.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
+from actions import task_proposal_engine  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("evolure.api")
