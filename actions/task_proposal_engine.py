@@ -88,6 +88,24 @@ def reject(dsn: str, proposal_id: int, reason: str | None = None) -> dict[str, A
     return updated
 
 
+def retry_sync(dsn: str, proposal_id: int) -> dict[str, Any]:
+    """Tenta de novo o push para a Webstudio de uma proposta já ACCEPTED
+    (ex: a tentativa anterior falhou por a Webstudio estar em baixo, porta
+    errada, etc). Não repete a transição PROPOSED -> ACCEPTED - só isso
+    exigiria voltar a PROPOSED, o que não faz sentido para uma proposta já
+    decidida."""
+    with psycopg.connect(dsn) as conn:
+        proposal = _get_proposal(conn, proposal_id)
+
+    if proposal["status"] != "ACCEPTED":
+        raise InvalidTransition(
+            f"Só é possível repetir o sync para propostas em ACCEPTED "
+            f"(estado atual: {proposal['status']})"
+        )
+
+    return _try_push_to_webstudio(dsn, proposal)
+
+
 def _try_push_to_webstudio(dsn: str, proposal: dict[str, Any]) -> dict[str, Any]:
     api_url = os.environ.get("WEBSTUDIO_API_URL", "").rstrip("/")
     api_key = os.environ.get("WEBSTUDIO_API_KEY", "")
@@ -108,7 +126,7 @@ def _try_push_to_webstudio(dsn: str, proposal: dict[str, Any]) -> dict[str, Any]
                 "title": proposal["title"],
                 "description": proposal["description"],
                 "priority": proposal["priority"],
-                "sourceProposalId": proposal["id"],
+                "sourceProposalId": str(proposal["id"]),
             },
             timeout=10,
         )

@@ -212,6 +212,19 @@ def reject_task_proposal(proposal_id: int, body: RejectProposalBody = RejectProp
         raise HTTPException(status_code=409, detail=str(exc))
 
 
+@app.post("/task-proposals/{proposal_id}/retry-sync")
+def retry_sync_task_proposal(proposal_id: int):
+    """Repete só o push para a Webstudio de uma proposta já ACCEPTED cujo
+    sync anterior falhou (ex: Webstudio em baixo, porta errada, etc) - sem
+    repetir a transição de estado."""
+    try:
+        return task_proposal_engine.retry_sync(DATABASE_URL, proposal_id)
+    except task_proposal_engine.ProposalNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except task_proposal_engine.InvalidTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
 @app.get("/webstudio/overview")
 def webstudio_overview():
     """Funil da Webstudio, com receita reconhecida e lucro real (receita -
