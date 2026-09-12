@@ -34,7 +34,8 @@ def generate_text(prompt: str, model: str = DEFAULT_MODEL) -> str:
         contents=prompt,
         config=types.GenerateContentConfig(
             temperature=0.4,  # baixa - queremos interpretação sóbria, não criatividade
-            max_output_tokens=1024,  # margem generosa: tokens de "thinking" contam para este limite
+            max_output_tokens=2048,  # tokens de "thinking" contam para este limite -
+            # 1024 estava a cortar o texto a meio de vez em quando
             thinking_config=thinking_config,
         ),
     )
@@ -60,7 +61,7 @@ def generate_json(prompt: str, model: str = DEFAULT_MODEL) -> dict:
         contents=prompt,
         config=types.GenerateContentConfig(
             temperature=0.3,
-            max_output_tokens=1024,
+            max_output_tokens=2048,
             thinking_config=thinking_config,
             response_mime_type="application/json",
         ),

@@ -128,7 +128,7 @@ def _try_push_to_webstudio(dsn: str, proposal: dict[str, Any]) -> dict[str, Any]
                 "priority": proposal["priority"],
                 "sourceProposalId": str(proposal["id"]),
             },
-            timeout=10,
+            timeout=30,  # compile a frio do Next.js em dev pode demorar mais que 10s
         )
         resp.raise_for_status()
         webstudio_task_id = resp.json().get("data", {}).get("id")

@@ -22,7 +22,8 @@ from pydantic import BaseModel
 # volume montado e o ficheiro presente no disco.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from actions import task_proposal_engine  # noqa: E402
+from actions import task_proposal_engine
+from intelligence.morning_brief import build_morning_brief  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("evolure.api")
@@ -319,3 +320,15 @@ def webstudio_development_activity():
         "by_type": by_type,
         "recent": recent,
     }
+
+
+@app.get("/morning-brief")
+def morning_brief():
+    """Fase 6 (L7) - Context Builder: junta Webstudio + Contela + Labs
+    num resumo diário único. Ver intelligence/morning_brief.py para o
+    escopo exato (e as limitações honestas) do que entra aqui."""
+    from datetime import datetime, timezone
+
+    brief = build_morning_brief(DATABASE_URL)
+    brief["generated_at"] = datetime.now(timezone.utc).isoformat()
+    return brief
